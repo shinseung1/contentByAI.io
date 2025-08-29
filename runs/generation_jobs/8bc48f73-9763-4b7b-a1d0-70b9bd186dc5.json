@@ -1,0 +1,10 @@
+{
+  "job_id": "8bc48f73-9763-4b7b-a1d0-70b9bd186dc5",
+  "status": "failed",
+  "message": "Content generation failed",
+  "progress": 0.0,
+  "content": null,
+  "error": "No AI configuration found",
+  "created_at": "2025-08-29T13:44:30.044418",
+  "completed_at": "2025-08-29T13:44:30.046500"
+}

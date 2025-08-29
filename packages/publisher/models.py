@@ -47,14 +47,15 @@ class PublishResponse(BaseModel):
     """Publishing response model."""
     job_id: str
     status: PublishStatus
-    platform: str
-    bundle_id: str
-    mode: PublishMode
-    created_at: datetime
-    updated_at: datetime
+    message: str = Field(..., description="Status message")
+    platform: Optional[str] = None
+    bundle_id: Optional[str] = None
+    mode: Optional[PublishMode] = None
+    created_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     scheduled_datetime: Optional[datetime] = None
     published_url: Optional[str] = None
-    error_message: Optional[str] = None
+    error: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
 
 
@@ -98,7 +99,7 @@ class PublishJob(Base):
     
     published_url = Column(String, nullable=True)
     error_message = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    job_metadata = Column(JSON, nullable=True)
     
     # Publishing details
     post_id = Column(String, nullable=True)  # Platform-specific post ID
