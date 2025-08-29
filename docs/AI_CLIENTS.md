@@ -2,9 +2,38 @@
 
 이 문서는 Claude API, ChatGPT, Gemini, Grok API 클라이언트의 설정 및 사용법을 설명합니다.
 
+## 프로젝트 구조
+
+```
+packages/
+├── ai_clients/              # AI API 클라이언트 패키지
+│   ├── __init__.py
+│   ├── models.py           # 공통 모델 및 타입
+│   ├── base.py            # 베이스 클라이언트 클래스
+│   ├── claude_client.py    # Claude API 클라이언트
+│   ├── openai_client.py    # OpenAI/ChatGPT API 클라이언트
+│   ├── gemini_client.py    # Google Gemini API 클라이언트
+│   ├── grok_client.py      # Grok API 클라이언트
+│   └── ai_factory.py       # 클라이언트 팩토리
+├── gen/                    # 콘텐츠 생성 패키지
+│   ├── __init__.py
+│   ├── models.py          # 생성 요청/응답 모델
+│   └── content_generator.py  # 콘텐츠 생성기
+└── core/                   # 핵심 패키지
+    ├── config.py          # 설정 관리
+    └── database.py        # 데이터베이스 연결
+```
+
 ## 설치 및 설정
 
-### 1. 환경 변수 설정
+### 1. 프로젝트 설치
+
+```bash
+# Python 3.11+ 필요 (Python 3.13 지원)
+pip install -e .
+```
+
+### 2. 환경 변수 설정
 
 `.env` 파일을 생성하고 API 키들을 설정하세요:
 
@@ -185,6 +214,37 @@ async def main():
 asyncio.run(main())
 ```
 
+## API 서버 실행
+
+### 개발 서버 시작
+
+```bash
+# FastAPI 서버 실행
+python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 3000 --reload
+
+# 서버가 시작되면 다음 URL에서 확인 가능:
+# - API 문서: http://127.0.0.1:3000/docs
+# - API 스펙: http://127.0.0.1:3000/openapi.json
+```
+
+### 콘텐츠 생성 API 사용
+
+```bash
+# 콘텐츠 생성 요청 (JSON)
+curl -X POST "http://127.0.0.1:3000/api/v1/generation/generate" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "topic": "인공지능의 미래",
+       "tone": "professional", 
+       "word_count": 800,
+       "include_images": true,
+       "target_language": "ko"
+     }'
+
+# 생성 작업 상태 확인
+curl "http://127.0.0.1:3000/api/v1/generation/jobs/{job_id}"
+```
+
 ## 예제 실행
 
 ### 기본 예제 실행
@@ -263,6 +323,58 @@ print(providers)  # ['claude', 'openai', 'gemini', 'grok']
 4. **폴백 설정**: 중요한 애플리케이션에서는 여러 제공업체 설정
 5. **토큰 모니터링**: 비용 관리를 위해 토큰 사용량 추적
 
+## 데이터베이스
+
+### 자동 생성되는 테이블
+
+서버 시작 시 자동으로 다음 테이블들이 생성됩니다:
+
+- `generation_jobs`: 콘텐츠 생성 작업 추적
+- `publish_jobs`: 퍼블리싱 작업 추적
+
+### 데이터베이스 위치
+
+```bash
+# SQLite 데이터베이스 파일
+data/aiwriter.db
+```
+
+## 지원하는 AI 모델
+
+### Claude (Anthropic)
+- claude-3-sonnet-20240229 (기본)
+- claude-3-haiku-20240307
+- claude-3-opus-20240229
+
+### OpenAI
+- gpt-4o (기본)
+- gpt-4o-mini
+- gpt-3.5-turbo
+
+### Google Gemini
+- gemini-1.5-pro (기본)
+- gemini-1.5-flash
+
+### Grok (X.AI)
+- grok-beta (기본)
+
+## API 엔드포인트
+
+### 콘텐츠 생성
+- `POST /api/v1/generation/generate` - 콘텐츠 생성 요청
+- `GET /api/v1/generation/jobs/{job_id}` - 작업 상태 조회
+- `GET /api/v1/generation/jobs` - 모든 작업 목록
+
+### 번들 관리
+- `GET /api/v1/bundles/` - 번들 목록
+- `GET /api/v1/bundles/{bundle_id}` - 번들 상세 정보
+- `DELETE /api/v1/bundles/{bundle_id}` - 번들 삭제
+
+### 퍼블리싱
+- `POST /api/v1/publishing/publish` - 콘텐츠 발행
+- `GET /api/v1/publishing/jobs/{job_id}` - 발행 상태 조회
+- `POST /api/v1/publishing/test-connection/{platform}` - 플랫폼 연결 테스트
+
 ## 문제 해결
 
 ### 일반적인 오류
@@ -271,6 +383,23 @@ print(providers)  # ['claude', 'openai', 'gemini', 'grok']
 2. **네트워크 오류**: 인터넷 연결과 방화벽 설정 확인
 3. **모델 오류**: 지정한 모델이 해당 제공업체에서 지원되는지 확인
 4. **토큰 한도 초과**: `max_tokens` 값을 조정하세요
+5. **데이터베이스 오류**: `data/` 디렉토리 생성 확인
+6. **포트 충돌**: 다른 포트 사용 (3000, 8080 등)
+
+### Python 버전 호환성
+
+- **지원 버전**: Python 3.11, 3.12, 3.13
+- **권장 버전**: Python 3.13 (최신 성능 최적화)
+
+### 의존성 설치 문제
+
+```bash
+# 의존성 재설치
+pip install -e . --force-reinstall
+
+# 개발 의존성 포함
+pip install -e ".[dev]"
+```
 
 ### 디버깅
 
@@ -278,6 +407,9 @@ print(providers)  # ['claude', 'openai', 'gemini', 'grok']
 # 원본 API 응답 확인
 response = await client.generate(request)
 print(response.raw_response)  # 디버깅용 원본 응답
+
+# 로그 레벨 조정 (.env 파일)
+LOG_LEVEL=DEBUG
 ```
 
 ## 라이선스

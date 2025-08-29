@@ -95,43 +95,82 @@ class ContentGenerator:
     
     def _get_ai_config(self) -> Optional[tuple[AIProvider, AIClientConfig]]:
         """Get AI configuration from environment."""
-        # Try Claude first
-        if os.getenv("CLAUDE_API_KEY"):
-            config = AIClientConfig(
-                api_key=os.getenv("CLAUDE_API_KEY"),
-                model=os.getenv("CLAUDE_MODEL", "claude-3-sonnet-20240229"),
-                max_tokens=int(os.getenv("AI_MAX_TOKENS", "4000")),
-                temperature=float(os.getenv("AI_TEMPERATURE", "0.7"))
-            )
-            return AIProvider.CLAUDE, config
+        from packages.core.config import get_settings
+        settings = get_settings()
         
-        # Try OpenAI
-        if os.getenv("OPENAI_API_KEY"):
+        # Check primary provider first
+        primary_provider = settings.PRIMARY_AI_PROVIDER.lower()
+        
+        if primary_provider == "openai" and settings.OPENAI_API_KEY:
             config = AIClientConfig(
-                api_key=os.getenv("OPENAI_API_KEY"),
-                model=os.getenv("OPENAI_MODEL", "gpt-4o"),
-                max_tokens=int(os.getenv("AI_MAX_TOKENS", "4000")),
-                temperature=float(os.getenv("AI_TEMPERATURE", "0.7"))
+                api_key=settings.OPENAI_API_KEY,
+                model=settings.OPENAI_MODEL,
+                max_tokens=settings.AI_MAX_TOKENS,
+                temperature=settings.AI_TEMPERATURE
             )
             return AIProvider.OPENAI, config
         
-        # Try Gemini
-        if os.getenv("GEMINI_API_KEY"):
+        elif primary_provider == "claude" and settings.CLAUDE_API_KEY:
             config = AIClientConfig(
-                api_key=os.getenv("GEMINI_API_KEY"),
-                model=os.getenv("GEMINI_MODEL", "gemini-1.5-pro"),
-                max_tokens=int(os.getenv("AI_MAX_TOKENS", "4000")),
-                temperature=float(os.getenv("AI_TEMPERATURE", "0.7"))
+                api_key=settings.CLAUDE_API_KEY,
+                model=settings.CLAUDE_MODEL,
+                max_tokens=settings.AI_MAX_TOKENS,
+                temperature=settings.AI_TEMPERATURE
+            )
+            return AIProvider.CLAUDE, config
+            
+        elif primary_provider == "gemini" and settings.GEMINI_API_KEY:
+            config = AIClientConfig(
+                api_key=settings.GEMINI_API_KEY,
+                model=settings.GEMINI_MODEL,
+                max_tokens=settings.AI_MAX_TOKENS,
+                temperature=settings.AI_TEMPERATURE
             )
             return AIProvider.GEMINI, config
-        
-        # Try Grok
-        if os.getenv("GROK_API_KEY"):
+            
+        elif primary_provider == "grok" and settings.GROK_API_KEY:
             config = AIClientConfig(
-                api_key=os.getenv("GROK_API_KEY"),
-                model=os.getenv("GROK_MODEL", "grok-beta"),
-                max_tokens=int(os.getenv("AI_MAX_TOKENS", "4000")),
-                temperature=float(os.getenv("AI_TEMPERATURE", "0.7"))
+                api_key=settings.GROK_API_KEY,
+                model=settings.GROK_MODEL,
+                max_tokens=settings.AI_MAX_TOKENS,
+                temperature=settings.AI_TEMPERATURE
+            )
+            return AIProvider.GROK, config
+        
+        # Fallback: try any available API key
+        if settings.OPENAI_API_KEY:
+            config = AIClientConfig(
+                api_key=settings.OPENAI_API_KEY,
+                model=settings.OPENAI_MODEL,
+                max_tokens=settings.AI_MAX_TOKENS,
+                temperature=settings.AI_TEMPERATURE
+            )
+            return AIProvider.OPENAI, config
+            
+        if settings.CLAUDE_API_KEY:
+            config = AIClientConfig(
+                api_key=settings.CLAUDE_API_KEY,
+                model=settings.CLAUDE_MODEL,
+                max_tokens=settings.AI_MAX_TOKENS,
+                temperature=settings.AI_TEMPERATURE
+            )
+            return AIProvider.CLAUDE, config
+            
+        if settings.GEMINI_API_KEY:
+            config = AIClientConfig(
+                api_key=settings.GEMINI_API_KEY,
+                model=settings.GEMINI_MODEL,
+                max_tokens=settings.AI_MAX_TOKENS,
+                temperature=settings.AI_TEMPERATURE
+            )
+            return AIProvider.GEMINI, config
+            
+        if settings.GROK_API_KEY:
+            config = AIClientConfig(
+                api_key=settings.GROK_API_KEY,
+                model=settings.GROK_MODEL,
+                max_tokens=settings.AI_MAX_TOKENS,
+                temperature=settings.AI_TEMPERATURE
             )
             return AIProvider.GROK, config
         

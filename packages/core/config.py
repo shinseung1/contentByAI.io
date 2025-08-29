@@ -38,8 +38,23 @@ class Settings(BaseSettings):
     
     # AI Services
     OPENAI_API_KEY: Optional[str] = Field(None, description="OpenAI API key")
+    OPENAI_MODEL: str = Field("gpt-4o", description="OpenAI model")
+    CLAUDE_API_KEY: Optional[str] = Field(None, description="Claude API key")
+    CLAUDE_MODEL: str = Field("claude-3-sonnet-20240229", description="Claude model")
+    GEMINI_API_KEY: Optional[str] = Field(None, description="Gemini API key")
+    GEMINI_MODEL: str = Field("gemini-1.5-pro", description="Gemini model")
+    GROK_API_KEY: Optional[str] = Field(None, description="Grok API key")
+    GROK_MODEL: str = Field("grok-beta", description="Grok model")
+    
+    # AI Client Settings
+    AI_MAX_TOKENS: int = Field(4000, description="Maximum tokens for AI responses")
+    AI_TEMPERATURE: float = Field(0.7, description="AI temperature setting")
+    AI_TIMEOUT: int = Field(30, description="AI request timeout in seconds")
+    PRIMARY_AI_PROVIDER: str = Field("openai", description="Primary AI provider")
+    AI_FALLBACK_ENABLED: bool = Field(True, description="Enable AI fallback")
+    
     ANTHROPIC_API_KEY: Optional[str] = Field(None, description="Anthropic API key")
-    AI_PROVIDER: str = Field("anthropic", description="AI provider (openai|anthropic)")
+    AI_PROVIDER: str = Field("openai", description="AI provider (openai|anthropic)")
     
     # Image Provider
     IMAGE_PROVIDER: str = Field("stock", description="Image provider (stock|gen|custom)")
@@ -73,6 +88,14 @@ class Settings(BaseSettings):
         valid_providers = ["openai", "anthropic"]
         if v not in valid_providers:
             raise ValueError(f"AI_PROVIDER must be one of {valid_providers}")
+        return v
+    
+    @validator("PRIMARY_AI_PROVIDER")
+    def validate_primary_ai_provider(cls, v):
+        """Validate primary AI provider."""
+        valid_providers = ["claude", "openai", "gemini", "grok"]
+        if v not in valid_providers:
+            raise ValueError(f"PRIMARY_AI_PROVIDER must be one of {valid_providers}")
         return v
 
     @validator("IMAGE_PROVIDER")
