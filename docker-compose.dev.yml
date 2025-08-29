@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=dev
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./runs:/app/runs
+      - ./bundles:/app/bundles
+    command: uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - redis
+    networks:
+      - aiwriter-network
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: frontend-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./web:/app/web
+      - /app/web/node_modules
+    environment:
+      - NODE_ENV=development
+    networks:
+      - aiwriter-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - aiwriter-network
+
+volumes:
+  redis-data:
+
+networks:
+  aiwriter-network:
+    driver: bridge

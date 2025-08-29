@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aiwriter"
+version = "0.1.0"
+description = "AI-based automatic blog posting system for WordPress and Google Blogger"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    {name = "AI Writer Team"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "apscheduler>=3.10.0",
+    "requests>=2.31.0",
+    "google-api-python-client>=2.100.0",
+    "google-auth-httplib2>=0.1.1",
+    "google-auth-oauthlib>=1.1.0",
+    "pillow>=10.0.0",
+    "aiofiles>=23.2.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.12.0",
+    "httpx>=0.25.0",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "mypy>=1.7.0",
+    "ruff>=0.1.0",
+    "python-dotenv>=1.0.0",
+    "click>=8.1.0",
+    "rich>=13.6.0",
+    "beautifulsoup4>=4.12.0",
+    "vcrpy>=5.1.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest-cov>=4.1.0",
+    "pre-commit>=3.5.0",
+    "black>=23.10.0"
+]
+
+[project.scripts]
+aiw = "apps.cli.main:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["apps*", "packages*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+ignore = ["E501", "B008"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
