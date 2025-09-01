@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Layout, Menu, theme } from 'antd'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, Outlet } from 'react-router-dom'
 import {
   DashboardOutlined,
   EditOutlined,
@@ -13,11 +13,7 @@ import {
 
 const { Header, Sider, Content } = Layout
 
-interface MainLayoutProps {
-  children: React.ReactNode
-}
-
-const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+const MainLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -27,24 +23,29 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const menuItems = [
     {
-      key: '/',
+      key: '/dashboard',
       icon: <DashboardOutlined />,
       label: '대시보드',
     },
     {
-      key: '/generation',
+      key: '/generate',
       icon: <EditOutlined />,
       label: '콘텐츠 생성',
     },
     {
-      key: '/bundles',
+      key: '/jobs',
       icon: <FolderOutlined />,
-      label: '번들 관리',
+      label: '작업 관리',
     },
     {
-      key: '/publishing',
+      key: '/posts',
       icon: <SendOutlined />,
-      label: '발행 관리',
+      label: '포스트 관리',
+    },
+    {
+      key: '/schedule',
+      icon: <SendOutlined />,
+      label: '스케줄 관리',
     },
     {
       key: '/settings',
@@ -58,9 +59,21 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   }
 
   return (
-    <Layout>
-      <Sider trigger={null} collapsible collapsed={collapsed}>
-        <div className="demo-logo-vertical" />
+    <Layout style={{ minHeight: '100vh' }}>
+      <Sider 
+        trigger={null} 
+        collapsible 
+        collapsed={collapsed}
+        style={{
+          overflow: 'auto',
+          height: '100vh',
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+        }}
+      >
+        <div className="demo-logo-vertical" style={{ height: 32, margin: 16, background: 'rgba(255, 255, 255, 0.3)' }} />
         <Menu
           theme="dark"
           mode="inline"
@@ -69,8 +82,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           onClick={({ key }) => handleMenuClick(key)}
         />
       </Sider>
-      <Layout>
-        <Header style={{ padding: 0, background: colorBgContainer }}>
+      <Layout style={{ marginLeft: collapsed ? 80 : 200, transition: 'margin-left 0.2s' }}>
+        <Header style={{ 
+          padding: 0, 
+          background: colorBgContainer,
+          position: 'sticky',
+          top: 0,
+          zIndex: 1,
+          width: '100%'
+        }}>
           <div style={{ 
             padding: '0 24px',
             display: 'flex',
@@ -87,8 +107,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             </div>
           </div>
         </Header>
-        <Content style={{ margin: '24px 16px', padding: 24, background: colorBgContainer }}>
-          {children}
+        <Content style={{ margin: '24px 16px', padding: 24, background: colorBgContainer, minHeight: 280 }}>
+          <Outlet />
         </Content>
       </Layout>
     </Layout>

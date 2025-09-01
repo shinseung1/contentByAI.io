@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from packages.core.config import get_settings
 from packages.core.database import create_tables
-from .routers import bundles, generation, publishing, health
+from .routers import bundles, generation, publishing, health, auth
 
 
 @asynccontextmanager
@@ -38,6 +38,7 @@ def create_app() -> FastAPI:
     )
     
     app.include_router(health.router, prefix="/api/v1")
+    app.include_router(auth.router, prefix="/api/v1")
     app.include_router(bundles.router, prefix="/api/v1")
     app.include_router(generation.router, prefix="/api/v1")
     app.include_router(publishing.router, prefix="/api/v1")
