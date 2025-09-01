@@ -34,6 +34,22 @@ docker-compose up -d
 # 웹: http://localhost:3000 (개발 환경)
 ```
 
+### 🔑 기본 접속 정보
+
+#### Admin 계정 정보
+- **Admin ID**: `admin`
+- **Admin Password**: `admin123!`
+
+#### 테스트 접속 URL
+- **API 서버**: http://localhost:3001 (Mac용)
+- **API 문서**: http://localhost:3001/docs  
+- **헬스체크**: http://localhost:3001/api/v1/health/
+- **AI 제공자별 페이지**:
+  - Gemini: http://localhost:3000/gemini
+  - Claude: http://localhost:3000/claude  
+  - OpenAI: http://localhost:3000/openai
+  - Grok: http://localhost:3000/grok
+
 ### 로컬 개발 환경
 
 ```bash
@@ -122,6 +138,21 @@ requests.post("http://localhost:8000/api/v1/publishing/publish", json={
 
 ## 🔧 개발 명령어
 
+### Mac용 서버 실행
+
+```bash
+# Python 서버 시작 (권장)
+python3 mac_server.py
+
+# 또는 테스트 서버 시작
+python3 test_server.py
+
+# 디버깅 모드
+python3 mac_debug.py
+```
+
+### 일반 개발 명령어
+
 ```bash
 # 개발 환경 설정
 make dev-setup
@@ -150,20 +181,30 @@ make restore BACKUP_FILE=backup.tar.gz
 ### 환경변수 (.env)
 
 ```bash
-# AI 서비스
-AI_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-your-key
+# AI 서비스 (필수 - 하나 이상 설정)
+PRIMARY_AI_PROVIDER=gemini
+GEMINI_API_KEY=AIzaSyBGJh2xvxFxIWS34Eu07HyziD_lC25leLg  # (현재 활성)
+CLAUDE_API_KEY=sk-ant-your-key
+OPENAI_API_KEY=sk-your-openai-key
+GROK_API_KEY=xai-your-grok-key
 
-# WordPress
+# WordPress (선택사항)
 WP_BASE_URL=https://your-site.com
 WP_APP_USER=your-username
 WP_APP_PASSWORD=your-app-password
 
-# Google Blogger
+# Google Blogger (선택사항)
 GOOGLE_CLIENT_ID=your-client-id
 GOOGLE_CLIENT_SECRET=your-secret
 GOOGLE_REFRESH_TOKEN=your-token
 BLOGGER_BLOG_ID=your-blog-id
+
+# 데이터베이스
+DATABASE_URL=sqlite:///data/aiwriter.db
+
+# API 서버 설정
+API_HOST=127.0.0.1
+API_PORT=3001  # Mac용 포트
 ```
 
 ## 🔒 보안 고려사항

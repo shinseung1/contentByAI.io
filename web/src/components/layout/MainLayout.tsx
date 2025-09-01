@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { Layout, Menu, theme } from 'antd'
+import { Layout, Menu, theme, Button, Avatar, Dropdown } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   DashboardOutlined,
   EditOutlined,
@@ -9,6 +10,8 @@ import {
   SettingOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  UserOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons'
 
 const { Header, Sider, Content } = Layout
@@ -21,6 +24,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
+  const { user, logout } = useAuth()
   const {
     token: { colorBgContainer },
   } = theme.useToken()
@@ -57,6 +61,24 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     navigate(key)
   }
 
+  const userMenuItems = [
+    {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: `${user?.username} (${user?.role})`,
+      disabled: true,
+    },
+    {
+      type: 'divider' as const,
+    },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: '로그아웃',
+      onClick: logout,
+    },
+  ]
+
   return (
     <Layout>
       <Sider trigger={null} collapsible collapsed={collapsed}>
@@ -84,6 +106,25 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 style: { fontSize: '18px', cursor: 'pointer' }
               })}
               <h2 style={{ margin: '0 0 0 16px' }}>AI Writer</h2>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <span style={{ color: '#666', fontSize: '14px' }}>
+                환영합니다, {user?.username}님
+              </span>
+              <Dropdown 
+                menu={{ items: userMenuItems }} 
+                placement="bottomRight"
+                arrow
+              >
+                <Avatar
+                  style={{ 
+                    backgroundColor: '#1890ff', 
+                    cursor: 'pointer'
+                  }}
+                  icon={<UserOutlined />}
+                />
+              </Dropdown>
             </div>
           </div>
         </Header>
