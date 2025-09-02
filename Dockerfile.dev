@@ -1,0 +1,10 @@
+# Development Dockerfile
+FROM node:18-alpine AS frontend-dev
+
+WORKDIR /app/web
+COPY web/package.json web/package-lock.json* ./
+RUN npm ci
+
+COPY web/ ./
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
