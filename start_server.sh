@@ -27,10 +27,10 @@ import uvicorn
 from api_test_endpoint import app
 
 print('📍 접속 URL:')
-print('   - API 서버: http://127.0.0.1:8000')
-print('   - API 문서: http://127.0.0.1:8000/docs')
-print('   - 헬스체크: http://127.0.0.1:8000/api/v1/health/')
+print('   - API 서버: http://127.0.0.1:3000')
+print('   - API 문서: http://127.0.0.1:3000/docs')
+print('   - 헬스체크: http://127.0.0.1:3000/api/v1/health/')
 print()
 
-uvicorn.run(app, host='127.0.0.1', port=8000, log_level='info')
+uvicorn.run(app, host='127.0.0.1', port=3000, log_level='info')
 "

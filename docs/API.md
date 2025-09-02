@@ -6,10 +6,10 @@ AI Writer는 RESTful API를 제공하여 외부 시스템과의 연동을 지원
 
 ## 기본 정보
 
-- **Base URL**: `http://localhost:8000/api/v1`
+- **Base URL**: `http://localhost:3000/api/v1`
 - **Content-Type**: `application/json`
 - **응답 형식**: JSON
-- **API 문서**: `http://localhost:8000/docs` (Swagger UI)
+- **API 문서**: `http://localhost:3000/docs` (Swagger UI)
 
 ## 인증
 
@@ -359,7 +359,7 @@ import requests
 import time
 
 # 기본 설정
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:3000/api/v1"
 
 def generate_content(topic):
     """콘텐츠 생성 요청"""
@@ -418,7 +418,7 @@ if __name__ == "__main__":
 
 ```bash
 # 콘텐츠 생성
-curl -X POST "http://localhost:8000/api/v1/generation/generate" \
+curl -X POST "http://localhost:3000/api/v1/generation/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "topic": "인공지능의 미래",
@@ -427,13 +427,13 @@ curl -X POST "http://localhost:8000/api/v1/generation/generate" \
   }'
 
 # 작업 상태 확인
-curl "http://localhost:8000/api/v1/generation/jobs/gen_12345678"
+curl "http://localhost:3000/api/v1/generation/jobs/gen_12345678"
 
 # 번들 조회
-curl "http://localhost:8000/api/v1/bundles/bundle_20240101_120000"
+curl "http://localhost:3000/api/v1/bundles/bundle_20240101_120000"
 
 # 발행 요청
-curl -X POST "http://localhost:8000/api/v1/publishing/publish" \
+curl -X POST "http://localhost:3000/api/v1/publishing/publish" \
   -H "Content-Type: application/json" \
   -d '{
     "bundle_id": "bundle_20240101_120000",
@@ -442,7 +442,7 @@ curl -X POST "http://localhost:8000/api/v1/publishing/publish" \
   }'
 
 # 연결 테스트
-curl -X POST "http://localhost:8000/api/v1/publishing/test-connection/wordpress"
+curl -X POST "http://localhost:3000/api/v1/publishing/test-connection/wordpress"
 ```
 
 ## 에러 코드
@@ -472,4 +472,4 @@ curl -X POST "http://localhost:8000/api/v1/publishing/test-connection/wordpress"
 - 하위 호환성: 메이저 버전 내에서 보장
 - 새 버전 출시 시 기존 버전은 최소 6개월간 유지
 
-더 자세한 정보는 [Swagger UI](http://localhost:8000/docs)에서 확인하실 수 있습니다.
+더 자세한 정보는 [Swagger UI](http://localhost:3000/docs)에서 확인하실 수 있습니다.

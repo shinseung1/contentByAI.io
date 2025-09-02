@@ -39,7 +39,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // 토큰 유효성 검증
   const validateToken = async (authToken: string) => {
     try {
-      const response = await axios.get('http://127.0.0.1:3001/api/v1/auth/validate', {
+      const response = await axios.get('http://127.0.0.1:3000/api/v1/auth/validate', {
         headers: {
           Authorization: `Bearer ${authToken}`
         }
@@ -92,7 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async () => {
     try {
       if (token) {
-        await axios.post('http://127.0.0.1:3001/api/v1/auth/logout');
+        await axios.post('http://127.0.0.1:3000/api/v1/auth/logout');
       }
     } catch (error) {
       console.error('Logout error:', error);

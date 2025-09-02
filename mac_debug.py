@@ -32,7 +32,7 @@ def check_network():
         print(f"❌ 127.0.0.1 테스트 실패: {e}")
     
     # 사용 가능한 포트 찾기
-    for port in [3001, 3002, 3003, 8000, 8001]:
+    for port in [3000, 3001, 3002, 3003]:
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

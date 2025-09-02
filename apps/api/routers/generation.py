@@ -15,6 +15,7 @@ router = APIRouter(prefix="/generation", tags=["generation"])
 class GenerateContentRequest(BaseModel):
     """Content generation request model."""
     topic: str = Field(..., min_length=1, max_length=500)
+    provider: Optional[str] = Field(None, max_length=50)
     tone: Optional[str] = Field("professional", max_length=50)
     word_count: Optional[int] = Field(800, ge=300, le=3000)
     include_images: bool = Field(True)
@@ -38,6 +39,7 @@ async def generate_content(
     
     generation_request = GenerationRequest(
         topic=request.topic,
+        provider=request.provider,
         tone=request.tone,
         word_count=request.word_count,
         include_images=request.include_images,

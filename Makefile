@@ -51,7 +51,7 @@ web-dev: ## Start web development server
 	cd web && npm run dev
 
 api-dev: ## Start API development server
-	uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000
+	uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 3000
 
 cli: ## Access CLI
 	python -m apps.cli.main
@@ -63,4 +63,4 @@ restore: ## Restore from backup (specify BACKUP_FILE=...)
 	tar -xzf $(BACKUP_FILE)
 
 health: ## Check service health
-	curl -f http://localhost:8000/api/v1/health/ || echo "Service is down"
+	curl -f http://localhost:3000/api/v1/health/ || echo "Service is down"

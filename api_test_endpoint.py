@@ -27,7 +27,7 @@ app = FastAPI(title="AI Writer API Tester", version="1.0.0")
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["http://localhost:3001", "http://127.0.0.1:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -676,12 +676,12 @@ async def root():
 
 if __name__ == "__main__":
     print("🚀 AI Writer API 테스트 서버 시작")
-    print(f"📍 API 문서: http://127.0.0.1:8000/docs")
-    print(f"🔗 프론트엔드: http://127.0.0.1:3000")
+    print(f"📍 API 문서: http://127.0.0.1:3000/docs")
+    print(f"🔗 프론트엔드: http://127.0.0.1:3001")
     
     uvicorn.run(
         app,
         host="127.0.0.1",
-        port=8000,
+        port=3000,
         reload=True
     )

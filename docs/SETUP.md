@@ -66,9 +66,9 @@ docker-compose -f docker-compose.dev.yml up
 ```
 
 #### 4. 접속 확인
-- **API**: http://localhost:8000
-- **웹 대시보드**: http://localhost:3000 (개발 환경)
-- **API 문서**: http://localhost:8000/docs
+- **API**: http://localhost:3000
+- **웹 대시보드**: http://localhost:3001 (개발 환경)
+- **API 문서**: http://localhost:3000/docs
 
 ### 방법 2: 로컬 개발 환경 설치
 
@@ -107,7 +107,7 @@ mkdir -p data logs runs bundles
 ```bash
 make api-dev
 # 또는
-uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 3000
 ```
 
 **터미널 2: 프론트엔드 서버**
@@ -270,7 +270,7 @@ make clean
 ```bash
 # 사용 중인 포트 확인
 netstat -an | grep :8000
-netstat -an | grep :3000
+netstat -an | grep :3001
 
 # Docker 컨테이너 정리
 docker-compose down
@@ -377,7 +377,7 @@ make restore BACKUP_FILE=backup-20240101_120000.tar.gz
 # 헬스체크
 make health
 # 또는
-curl http://localhost:8000/api/v1/health/
+curl http://localhost:3000/api/v1/health/
 
 # 시스템 리소스 확인
 docker stats

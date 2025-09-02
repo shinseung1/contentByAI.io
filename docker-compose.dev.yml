@@ -15,7 +15,7 @@ services:
       - ./logs:/app/logs
       - ./runs:/app/runs
       - ./bundles:/app/bundles
-    command: uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn apps.api.main:app --host 0.0.0.0 --port 3000 --reload
     depends_on:
       - redis
     networks:
@@ -27,7 +27,7 @@ services:
       dockerfile: Dockerfile.dev
       target: frontend-dev
     ports:
-      - "3000:3000"
+      - "3001:3001"
     volumes:
       - ./web:/app/web
       - /app/web/node_modules

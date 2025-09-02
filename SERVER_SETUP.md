@@ -61,7 +61,7 @@ python3 api_test_endpoint.py
 
 # 출력 예시:
 # 🚀 AI Writer API 테스트 서버 시작
-# 📍 API 문서: http://127.0.0.1:8000/docs
+# 📍 API 문서: http://127.0.0.1:3000/docs
 # 🔗 프론트엔드: http://127.0.0.1:3000
 ```
 
@@ -69,10 +69,10 @@ python3 api_test_endpoint.py
 
 ```bash
 # 개발 모드 (자동 재시작)
-uvicorn api_test_endpoint:app --reload --host 127.0.0.1 --port 8000
+uvicorn api_test_endpoint:app --reload --host 127.0.0.1 --port 3000
 
 # 프로덕션 모드
-uvicorn api_test_endpoint:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn api_test_endpoint:app --host 0.0.0.0 --port 3000 --workers 4
 ```
 
 ### 방법 3: 백그라운드 실행
@@ -94,7 +94,7 @@ tail -f server.log
 
 ```bash
 # 서버 상태 확인
-curl http://127.0.0.1:8000/api/v1/health/
+curl http://127.0.0.1:3000/api/v1/health/
 
 # 예상 응답:
 # {
@@ -106,15 +106,15 @@ curl http://127.0.0.1:8000/api/v1/health/
 
 ### 2. API 문서 접속
 
-- **Swagger UI**: http://127.0.0.1:8000/docs
-- **ReDoc**: http://127.0.0.1:8000/redoc
+- **Swagger UI**: http://127.0.0.1:3000/docs
+- **ReDoc**: http://127.0.0.1:3000/redoc
 
 ## 🧪 API 테스트
 
 ### 1. Gemini API 테스트
 
 ```bash
-curl -X POST "http://127.0.0.1:8000/api/v1/test/ai" \
+curl -X POST "http://127.0.0.1:3000/api/v1/test/ai" \
   -H "Content-Type: application/json" \
   -d '{
     "provider": "gemini",
@@ -125,7 +125,7 @@ curl -X POST "http://127.0.0.1:8000/api/v1/test/ai" \
 ### 2. 콘텐츠 생성 테스트
 
 ```bash
-curl -X POST "http://127.0.0.1:8000/api/v1/generation/generate" \
+curl -X POST "http://127.0.0.1:3000/api/v1/generation/generate" \
   -H "Content-Type: application/json" \
   -d '{
     "provider": "gemini",
@@ -139,10 +139,10 @@ curl -X POST "http://127.0.0.1:8000/api/v1/generation/generate" \
 
 ```bash
 # Gemini 테스트 결과 조회
-curl "http://127.0.0.1:8000/api/v1/test-results/gemini?limit=10"
+curl "http://127.0.0.1:3000/api/v1/test-results/gemini?limit=10"
 
 # Gemini 통계 조회  
-curl "http://127.0.0.1:8000/api/v1/provider-stats/gemini"
+curl "http://127.0.0.1:3000/api/v1/provider-stats/gemini"
 ```
 
 ## 📊 사용 가능한 API 엔드포인트
@@ -162,8 +162,8 @@ curl "http://127.0.0.1:8000/api/v1/provider-stats/gemini"
 ### 1. 포트 충돌
 
 ```bash
-# 8000번 포트 사용 중인 프로세스 확인
-lsof -i :8000
+# 3000번 포트 사용 중인 프로세스 확인
+lsof -i :3000
 
 # 프로세스 종료
 kill -9 <PID>
@@ -212,11 +212,11 @@ npm install
 npm run dev
 
 # 브라우저에서 접속
-# - 메인 대시보드: http://localhost:3000
-# - Gemini 페이지: http://localhost:3000/gemini
-# - Claude 페이지: http://localhost:3000/claude
-# - OpenAI 페이지: http://localhost:3000/openai
-# - Grok 페이지: http://localhost:3000/grok
+# - 메인 대시보드: http://localhost:3001
+# - Gemini 페이지: http://localhost:3001/gemini
+# - Claude 페이지: http://localhost:3001/claude
+# - OpenAI 페이지: http://localhost:3001/openai
+# - Grok 페이지: http://localhost:3001/grok
 ```
 
 ## 📝 로그 및 모니터링
@@ -250,10 +250,10 @@ APP_ENV=development  # 또는 production
 
 # 서버 호스트/포트
 API_HOST=127.0.0.1
-API_PORT=8000
+API_PORT=3000
 
 # CORS 설정
-CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+CORS_ORIGINS=http://localhost:3001,http://127.0.0.1:3000
 
 # 로그 레벨
 LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
@@ -272,8 +272,8 @@ LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
 모든 설정이 완료되면 다음이 정상 작동해야 합니다:
 
 ✅ **서버 시작**: `python3 api_test_endpoint.py`  
-✅ **헬스체크**: http://127.0.0.1:8000/api/v1/health/  
-✅ **API 문서**: http://127.0.0.1:8000/docs  
+✅ **헬스체크**: http://127.0.0.1:3000/api/v1/health/  
+✅ **API 문서**: http://127.0.0.1:3000/docs  
 ✅ **Gemini 테스트**: API를 통한 실제 응답  
 ✅ **데이터베이스**: 테스트 결과 저장 및 조회  
 

@@ -68,7 +68,7 @@ class ContentGenerator:
         
         try:
             # Get AI client configuration
-            ai_config = self._get_ai_config()
+            ai_config = self._get_ai_config(request.provider)
             if not ai_config:
                 raise ValueError("No AI configuration found")
             
@@ -93,15 +93,16 @@ class ContentGenerator:
         
         self.save_job_status(job_id, response)
     
-    def _get_ai_config(self) -> Optional[tuple[AIProvider, AIClientConfig]]:
+    def _get_ai_config(self, requested_provider: Optional[str] = None) -> Optional[tuple[AIProvider, AIClientConfig]]:
         """Get AI configuration from environment."""
         from packages.core.config import get_settings
         settings = get_settings()
         
-        # Check primary provider first
-        primary_provider = settings.PRIMARY_AI_PROVIDER.lower()
+        # Use requested provider if available, otherwise use primary provider
+        target_provider = requested_provider.lower() if requested_provider else settings.PRIMARY_AI_PROVIDER.lower()
         
-        if primary_provider == "openai" and settings.OPENAI_API_KEY:
+        # Try requested/primary provider first
+        if target_provider == "openai" and settings.OPENAI_API_KEY:
             config = AIClientConfig(
                 api_key=settings.OPENAI_API_KEY,
                 model=settings.OPENAI_MODEL,
@@ -110,7 +111,7 @@ class ContentGenerator:
             )
             return AIProvider.OPENAI, config
         
-        elif primary_provider == "claude" and settings.CLAUDE_API_KEY:
+        elif target_provider == "claude" and settings.CLAUDE_API_KEY:
             config = AIClientConfig(
                 api_key=settings.CLAUDE_API_KEY,
                 model=settings.CLAUDE_MODEL,
@@ -119,7 +120,7 @@ class ContentGenerator:
             )
             return AIProvider.CLAUDE, config
             
-        elif primary_provider == "gemini" and settings.GEMINI_API_KEY:
+        elif target_provider == "gemini" and settings.GEMINI_API_KEY:
             config = AIClientConfig(
                 api_key=settings.GEMINI_API_KEY,
                 model=settings.GEMINI_MODEL,
@@ -128,7 +129,7 @@ class ContentGenerator:
             )
             return AIProvider.GEMINI, config
             
-        elif primary_provider == "grok" and settings.GROK_API_KEY:
+        elif target_provider == "grok" and settings.GROK_API_KEY:
             config = AIClientConfig(
                 api_key=settings.GROK_API_KEY,
                 model=settings.GROK_MODEL,

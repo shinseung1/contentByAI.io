@@ -19,9 +19,14 @@ class Settings(BaseSettings):
     
     # API Server
     API_HOST: str = Field("0.0.0.0", description="API server host")
-    API_PORT: int = Field(8000, description="API server port")
+    API_PORT: int = Field(3000, description="API server port")
     API_CORS_ORIGINS: List[str] = Field(
-        ["http://localhost:3000", "http://127.0.0.1:3000"],
+        [
+            "http://localhost:3001", 
+            "http://127.0.0.1:3001",
+            "http://localhost:3003", 
+            "http://127.0.0.1:3003"
+        ],
         description="CORS allowed origins"
     )
     

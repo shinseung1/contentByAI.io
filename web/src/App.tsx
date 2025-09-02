@@ -6,14 +6,12 @@ import MainLayout from './components/layout/MainLayout'
 import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
 import Generation from './pages/Generation'
+import GenerationGemini from './pages/GenerationGemini'
+import GenerationClaude from './pages/GenerationClaude'
+import GenerationOpenAI from './pages/GenerationOpenAI'
 import Bundles from './pages/Bundles'
 import Publishing from './pages/Publishing'
 import Settings from './pages/Settings'
-import TestPage from './pages/TestPage'
-import GeminiPage from './pages/GeminiPage'
-import ClaudePage from './pages/ClaudePage'
-import OpenAIPage from './pages/OpenAIPage'
-import GrokPage from './pages/GrokPage'
 import './App.css'
 
 const AppContent: React.FC = () => {
@@ -42,14 +40,12 @@ const AppContent: React.FC = () => {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/generation" element={<Generation />} />
+          <Route path="/generation/gemini" element={<GenerationGemini />} />
+          <Route path="/generation/claude" element={<GenerationClaude />} />
+          <Route path="/generation/openai" element={<GenerationOpenAI />} />
           <Route path="/bundles" element={<Bundles />} />
           <Route path="/publishing" element={<Publishing />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/test" element={<TestPage />} />
-          <Route path="/gemini" element={<GeminiPage />} />
-          <Route path="/claude" element={<ClaudePage />} />
-          <Route path="/openai" element={<OpenAIPage />} />
-          <Route path="/grok" element={<GrokPage />} />
         </Routes>
       </MainLayout>
     </Layout>

@@ -8,7 +8,7 @@ Mac에서 서버 연결 문제가 발생할 수 있는 원인과 해결 방법�
 ```bash
 # 포트 사용 확인
 lsof -i :3001
-lsof -i :8000
+lsof -i :3000
 
 # 실행 중인 Python 프로세스 확인  
 ps aux | grep python3
@@ -162,7 +162,7 @@ pkill -f python3
 
 # 2. 포트 정리
 sudo lsof -ti:3001 | xargs sudo kill -9
-sudo lsof -ti:8000 | xargs sudo kill -9
+sudo lsof -ti:3000 | xargs sudo kill -9
 
 # 3. 간단한 테스트 서버 시작
 python3 test_server.py

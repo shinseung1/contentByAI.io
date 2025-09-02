@@ -21,7 +21,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setErrorMessage('');
 
     try {
-      const response = await axios.post('http://127.0.0.1:3001/api/v1/auth/login', {
+      const response = await axios.post('http://127.0.0.1:3000/api/v1/auth/login', {
         username: values.username,
         password: values.password
       });
@@ -48,19 +48,45 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div style={{
+    <div className="login-page" style={{
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      background: 'linear-gradient(135deg, #0a0a0a 0%, #1f1f1f 50%, #262626 100%)',
+      padding: '20px'
     }}>
       <Card
-        title="AI Writer 로그인"
+        title={
+          <div style={{
+            textAlign: 'center',
+            background: 'linear-gradient(135deg, #722ed1, #1890ff)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            fontSize: '24px',
+            fontWeight: 'bold',
+            marginBottom: '8px'
+          }}>
+            AI Writer
+          </div>
+        }
         style={{
           width: 400,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-          borderRadius: '12px'
+          background: '#262626',
+          border: '1px solid #434343',
+          borderRadius: '16px',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
+        }}
+        headStyle={{
+          background: '#1f1f1f',
+          border: 'none',
+          borderRadius: '16px 16px 0 0',
+          borderBottom: '1px solid #434343'
+        }}
+        bodyStyle={{
+          background: '#262626',
+          borderRadius: '0 0 16px 16px'
         }}
       >
         {errorMessage && (
@@ -111,7 +137,19 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               style={{
                 height: '48px',
                 fontSize: '16px',
-                borderRadius: '8px'
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #722ed1, #1890ff)',
+                border: 'none',
+                boxShadow: '0 4px 12px rgba(114, 46, 209, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(114, 46, 209, 0.4)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(114, 46, 209, 0.3)'
               }}
             >
               로그인
@@ -122,15 +160,18 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         <div style={{ 
           marginTop: '24px', 
           padding: '16px', 
-          background: '#f8f9fa', 
+          background: 'rgba(114, 46, 209, 0.1)', 
+          border: '1px solid rgba(114, 46, 209, 0.2)',
           borderRadius: '8px',
           fontSize: '14px',
-          color: '#666'
+          color: '#ffffff'
         }}>
-          <div><strong>테스트 계정:</strong></div>
-          <div>Admin: admin / admin123!</div>
-          <div>Validator: validator / validator123!</div>
-          <div>User: testuser / test123!</div>
+          <div style={{ color: '#722ed1', fontWeight: 'bold', marginBottom: '8px' }}>
+            💡 테스트 계정
+          </div>
+          <div style={{ color: '#a6a6a6' }}>
+            <strong style={{ color: '#ffffff' }}>Admin:</strong> admin / admin123!
+          </div>
         </div>
       </Card>
     </div>

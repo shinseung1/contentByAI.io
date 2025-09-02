@@ -21,6 +21,7 @@ class GenerationStatus(str, Enum):
 class GenerationRequest(BaseModel):
     """Content generation request model."""
     topic: str = Field(..., min_length=1, max_length=500, description="Content topic")
+    provider: Optional[str] = Field(None, max_length=50, description="AI provider (gemini, openai, claude, grok)")
     tone: Optional[str] = Field("professional", max_length=50, description="Content tone")
     word_count: Optional[int] = Field(800, ge=300, le=3000, description="Target word count")
     include_images: bool = Field(True, description="Whether to include images")

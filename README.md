@@ -30,8 +30,8 @@ cp .env.example .env
 docker-compose up -d
 
 # 4. 접속
-# API: http://localhost:8000
-# 웹: http://localhost:3000 (개발 환경)
+# API: http://localhost:3000
+# 웹: http://localhost:3001 (개발 환경)
 ```
 
 ### 🔑 기본 접속 정보
@@ -45,10 +45,10 @@ docker-compose up -d
 - **API 문서**: http://localhost:3001/docs  
 - **헬스체크**: http://localhost:3001/api/v1/health/
 - **AI 제공자별 페이지**:
-  - Gemini: http://localhost:3000/gemini
-  - Claude: http://localhost:3000/claude  
-  - OpenAI: http://localhost:3000/openai
-  - Grok: http://localhost:3000/grok
+  - Gemini: http://localhost:3001/gemini
+  - Claude: http://localhost:3001/claude  
+  - OpenAI: http://localhost:3001/openai
+  - Grok: http://localhost:3001/grok
 
 ### 로컬 개발 환경
 
@@ -119,7 +119,7 @@ aiw bundle:preview ./bundles/20240101_120000/
 import requests
 
 # 콘텐츠 생성 요청
-response = requests.post("http://localhost:8000/api/v1/generation/generate", json={
+response = requests.post("http://localhost:3000/api/v1/generation/generate", json={
     "topic": "인공지능의 미래",
     "tone": "professional",
     "word_count": 800,
@@ -129,7 +129,7 @@ response = requests.post("http://localhost:8000/api/v1/generation/generate", jso
 job_id = response.json()["job_id"]
 
 # 발행 요청
-requests.post("http://localhost:8000/api/v1/publishing/publish", json={
+requests.post("http://localhost:3000/api/v1/publishing/publish", json={
     "bundle_id": "bundle_20240101_120000",
     "platform": "wordpress", 
     "mode": "publish"
