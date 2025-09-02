@@ -558,6 +558,35 @@ class DatabaseManager:
             conn.execute("DELETE FROM login_sessions WHERE session_token = ?", (session_token,))
             conn.commit()
 
+    def get_session_by_token(self, session_token: str):
+        """토큰으로 세션 조회"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("""
+                SELECT u.username, s.expires_at
+                FROM users u
+                JOIN login_sessions s ON u.id = s.user_id
+                WHERE s.session_token = ?
+            """, (session_token,))
+            
+            row = cursor.fetchone()
+            if row:
+                return type('Session', (), {
+                    'username': row['username'],
+                    'expires_at': row['expires_at']
+                })()
+            return None
+
+    def reset_failed_attempts(self, username: str):
+        """로그인 실패 횟수 초기화"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                UPDATE users 
+                SET login_attempts = 0, locked_until = NULL, updated_at = ?
+                WHERE username = ?
+            """, (datetime.now().isoformat(), username))
+            conn.commit()
+
 # 전역 데이터베이스 인스턴스
 db = DatabaseManager()
 

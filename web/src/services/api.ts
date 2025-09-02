@@ -10,7 +10,7 @@ export interface GenerationRequest {
 }
 
 export interface GenerationJobResponse {
-  job_id: string
+  jobId: string
   status: string
   message: string
 }
@@ -35,10 +35,12 @@ export interface GenerationResponse {
 export const api = {
   // Content Generation
   generateContent: async (request: GenerationRequest): Promise<GenerationJobResponse> => {
+    const token = localStorage.getItem('authToken')
     const response = await fetch(`${API_BASE_URL}/generation/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify(request),
     })
@@ -51,7 +53,12 @@ export const api = {
   },
 
   getGenerationJob: async (jobId: string): Promise<GenerationResponse> => {
-    const response = await fetch(`${API_BASE_URL}/generation/jobs/${jobId}`)
+    const token = localStorage.getItem('authToken')
+    const response = await fetch(`${API_BASE_URL}/generation/jobs/${jobId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
     
     if (!response.ok) {
       throw new Error(`Failed to get job: ${response.statusText}`)
@@ -60,8 +67,14 @@ export const api = {
     return response.json()
   },
 
-  listGenerationJobs: async (): Promise<string[]> => {
-    const response = await fetch(`${API_BASE_URL}/generation/jobs`)
+  listGenerationJobs: async (provider?: string): Promise<any[]> => {
+    const token = localStorage.getItem('authToken')
+    const url = provider ? `${API_BASE_URL}/generation/jobs?provider=${provider}` : `${API_BASE_URL}/generation/jobs`
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
     
     if (!response.ok) {
       throw new Error(`Failed to list jobs: ${response.statusText}`)

@@ -1,551 +1,529 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Card,
-  Button,
-  Input,
-  Typography,
-  Space,
-  Alert,
-  Spin,
-  Tag,
-  Divider,
-  Row,
-  Col,
-  Statistic,
-  Table,
-  Select,
-  message,
-  Progress
-} from 'antd';
-import {
-  PlayCircleOutlined,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
-  RocketOutlined,
-  ClockCircleOutlined,
-  OpenAIIcon,
-  FileTextOutlined
-} from '@ant-design/icons';
-import { ApiService } from '../services/apiService';
+import React, { useState, useEffect } from 'react'
+import { Card, Form, Input, Button, Select, InputNumber, Switch, Typography, Space, message, Row, Col, Statistic, Progress, Alert, List, Tag, Divider } from 'antd'
+import { ExperimentOutlined, SendOutlined, RocketOutlined, ThunderboltOutlined, EyeOutlined, HistoryOutlined, ClockCircleOutlined } from '@ant-design/icons'
+import { api, GenerationRequest, GenerationResponse } from '../services/api'
 
-const { Title, Text, Paragraph } = Typography;
-const { TextArea } = Input;
-const { Option } = Select;
-
-interface TestResult {
-  id: number;
-  provider: string;
-  prompt: string;
-  response: string;
-  success: boolean;
-  errorMessage?: string;
-  tokenUsage?: {
-    promptTokenCount: number;
-    candidatesTokenCount: number;
-    totalTokenCount: number;
-  };
-  responseTimeMs?: number;
-  createdAt: string;
-}
-
-interface GenerationJob {
-  jobId: string;
-  provider: string;
-  topic: string;
-  tone: string;
-  wordCount: number;
-  status: string;
-  progress: number;
-  content?: string;
-  errorMessage?: string;
-  createdAt: string;
-}
-
-interface ProviderStats {
-  totalTests: number;
-  successfulTests: number;
-  failedTests: number;
-  successRate: number;
-  avgResponseTime: number;
-  lastTestAt?: string;
-}
+const { Title, Text } = Typography
+const { TextArea } = Input
 
 const OpenAIPage: React.FC = () => {
-  const [testPrompt, setTestPrompt] = useState<string>('');
-  const [isTestLoading, setIsTestLoading] = useState(false);
-  const [testResults, setTestResults] = useState<TestResult[]>([]);
-  const [stats, setStats] = useState<ProviderStats | null>(null);
-  
-  const [generationTopic, setGenerationTopic] = useState<string>('');
-  const [generationTone, setGenerationTone] = useState<string>('professional');
-  const [wordCount, setWordCount] = useState<number>(800);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationJobs, setGenerationJobs] = useState<GenerationJob[]>([]);
+  const [form] = Form.useForm()
+  const [loading, setLoading] = useState(false)
+  const [currentJob, setCurrentJob] = useState<string | null>(null)
+  const [jobStatus, setJobStatus] = useState<GenerationResponse | null>(null)
+  const [progress, setProgress] = useState(0)
+  const [historyJobs, setHistoryJobs] = useState<any[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
 
+  // 히스토리 로드
+  const loadHistory = async () => {
+    setHistoryLoading(true)
+    try {
+      const jobs = await api.listGenerationJobs('openai')
+      setHistoryJobs(jobs)
+    } catch (error) {
+      console.error('Failed to load history:', error)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  // 컴포넌트 마운트 시 히스토리 로드
   useEffect(() => {
-    loadTestResults();
-    loadStats();
-    loadGenerationJobs();
-  }, []);
+    loadHistory()
+  }, [])
 
-  const loadTestResults = async () => {
+  const handleGenerate = async (values: any) => {
+    setLoading(true)
+    setCurrentJob(null)
+    setJobStatus(null)
+    setProgress(0)
+
     try {
-      const results = await ApiService.getTestResults('openai');
-      setTestResults(results);
-    } catch (error) {
-      console.error('Failed to load test results:', error);
-    }
-  };
+      const request: GenerationRequest = {
+        ...values,
+        provider: 'openai'
+      }
 
-  const loadStats = async () => {
-    try {
-      const providerStats = await ApiService.getProviderStats('openai');
-      setStats(providerStats);
-    } catch (error) {
-      console.error('Failed to load stats:', error);
-    }
-  };
-
-  const loadGenerationJobs = async () => {
-    try {
-      const jobs = await ApiService.getGenerationJobs('openai');
-      setGenerationJobs(jobs);
-    } catch (error) {
-      console.error('Failed to load generation jobs:', error);
-    }
-  };
-
-  const runTest = async () => {
-    if (!testPrompt.trim()) {
-      message.warning('테스트할 프롬프트를 입력해주세요.');
-      return;
-    }
-
-    setIsTestLoading(true);
-    
-    try {
-      const result = await ApiService.testAiApi('openai', testPrompt);
+      console.log('OpenAI generation request:', request)
       
-      if (result.success) {
-        message.success('OpenAI API 테스트가 성공했습니다!');
-        loadTestResults();
-        loadStats();
-      } else {
-        message.error('OpenAI API 테스트가 실패했습니다.');
+      // Start generation
+      const jobResponse = await api.generateContent(request)
+      setCurrentJob(jobResponse.jobId)
+      
+      message.success(`OpenAI 콘텐츠 생성이 시작되었습니다! (Job ID: ${jobResponse.jobId})`)
+      
+      // Poll for results
+      pollJobStatus(jobResponse.jobId)
+      
+    } catch (error) {
+      console.error('Generation error:', error)
+      message.error('콘텐츠 생성 중 오류가 발생했습니다: ' + (error as Error).message)
+      setLoading(false)
+    }
+  }
+
+  const pollJobStatus = async (jobId: string) => {
+    try {
+      const status = await api.getGenerationJob(jobId)
+      setJobStatus(status)
+      setProgress(status.progress * 100)
+
+      if (status.status === 'completed') {
+        message.success('콘텐츠 생성이 완료되었습니다!')
+        setLoading(false)
+        loadHistory() // 히스토리 새로고침
+      } else if (status.status === 'failed') {
+        message.error(`콘텐츠 생성이 실패했습니다: ${status.error}`)
+        setLoading(false)
+      } else if (status.status === 'in_progress') {
+        // Continue polling
+        setTimeout(() => pollJobStatus(jobId), 2000)
       }
     } catch (error) {
-      message.error('API 테스트 중 오류가 발생했습니다.');
-    } finally {
-      setIsTestLoading(false);
+      console.error('Polling error:', error)
+      message.error('작업 상태 확인 중 오류가 발생했습니다')
+      setLoading(false)
     }
-  };
-
-  const generateContent = async () => {
-    if (!generationTopic.trim()) {
-      message.warning('생성할 콘텐츠의 주제를 입력해주세요.');
-      return;
-    }
-
-    setIsGenerating(true);
-    
-    try {
-      const response = await ApiService.generateContent({
-        provider: 'openai',
-        topic: generationTopic,
-        tone: generationTone,
-        wordCount: wordCount,
-        includeImages: true,
-        targetLanguage: 'ko'
-      });
-      
-      message.success('콘텐츠 생성이 시작되었습니다!');
-      loadGenerationJobs();
-      
-      // 작업 상태 모니터링
-      monitorJob(response.jobId);
-      
-    } catch (error) {
-      message.error('콘텐츠 생성 요청에 실패했습니다.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const monitorJob = async (jobId: string) => {
-    const checkStatus = async () => {
-      try {
-        const status = await ApiService.getJobStatus(jobId);
-        
-        setGenerationJobs(prev => 
-          prev.map(job => 
-            job.jobId === jobId 
-              ? { ...job, status: status.status, progress: status.progress || 0 }
-              : job
-          )
-        );
-        
-        if (status.status === 'completed') {
-          message.success('콘텐츠 생성이 완료되었습니다!');
-          loadGenerationJobs();
-        } else if (status.status === 'failed') {
-          message.error('콘텐츠 생성에 실패했습니다.');
-          loadGenerationJobs();
-        } else if (status.status === 'in_progress') {
-          setTimeout(checkStatus, 3000);
-        }
-      } catch (error) {
-        console.error('Failed to check job status:', error);
-      }
-    };
-    
-    setTimeout(checkStatus, 1000);
-  };
-
-  const testResultColumns = [
-    {
-      title: '시간',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 140,
-      render: (text: string) => new Date(text).toLocaleString(),
-    },
-    {
-      title: '프롬프트',
-      dataIndex: 'prompt',
-      key: 'prompt',
-      ellipsis: true,
-      render: (text: string) => (
-        <Text style={{ maxWidth: 200 }} ellipsis={{ tooltip: text }}>
-          {text}
-        </Text>
-      ),
-    },
-    {
-      title: '결과',
-      dataIndex: 'success',
-      key: 'success',
-      width: 80,
-      render: (success: boolean) => (
-        <Tag color={success ? 'success' : 'error'}>
-          {success ? '성공' : '실패'}
-        </Tag>
-      ),
-    },
-    {
-      title: '응답시간',
-      dataIndex: 'responseTimeMs',
-      key: 'responseTimeMs',
-      width: 100,
-      render: (ms: number) => ms ? `${ms}ms` : '-',
-    },
-    {
-      title: '토큰',
-      dataIndex: 'tokenUsage',
-      key: 'tokenUsage',
-      width: 100,
-      render: (usage: any) => 
-        usage ? `${usage.totalTokenCount || 0}` : '-',
-    },
-  ];
-
-  const generationJobColumns = [
-    {
-      title: '생성 시간',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 140,
-      render: (text: string) => new Date(text).toLocaleString(),
-    },
-    {
-      title: '주제',
-      dataIndex: 'topic',
-      key: 'topic',
-      ellipsis: true,
-    },
-    {
-      title: '톤',
-      dataIndex: 'tone',
-      key: 'tone',
-      width: 100,
-    },
-    {
-      title: '상태',
-      dataIndex: 'status',
-      key: 'status',
-      width: 120,
-      render: (status: string, record: GenerationJob) => (
-        <div>
-          <Tag color={
-            status === 'completed' ? 'success' :
-            status === 'failed' ? 'error' :
-            status === 'in_progress' ? 'processing' : 'default'
-          }>
-            {status === 'completed' ? '완료' :
-             status === 'failed' ? '실패' :
-             status === 'in_progress' ? '진행중' : '대기'}
-          </Tag>
-          {status === 'in_progress' && (
-            <Progress 
-              percent={record.progress} 
-              size="small" 
-              style={{ marginTop: 4 }}
-            />
-          )}
-        </div>
-      ),
-    },
-  ];
-
-  const presetPrompts = [
-    { label: '기본 인사', value: '안녕하세요! 간단한 인사말로 답해주세요.' },
-    { label: '요약 능력 테스트', value: '딥러닝과 머신러닝의 차이점을 간단명료하게 요약해주세요.' },
-    { label: '창의적 제안', value: '환경 친화적인 스마트폰 케이스 아이디어 5가지를 제안해주세요.' },
-    { label: '문제 해결', value: '작은 카페의 매출 증대를 위한 마케팅 전략을 구체적으로 제안해주세요.' },
-  ];
+  }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ marginBottom: 24 }}>
+    <div>
+      <div className="page-header">
         <Title level={1}>
-          <span style={{ color: '#00A67E' }}>🚀</span> OpenAI GPT
+          <ExperimentOutlined /> OpenAI 콘텐츠 생성
         </Title>
-        <Paragraph type="secondary" style={{ fontSize: '16px' }}>
-          OpenAI의 강력한 GPT 모델을 사용하여 다양한 콘텐츠를 생성할 수 있습니다.
-          뛰어난 언어 이해력과 창의적 글쓰기 능력을 자랑합니다.
-        </Paragraph>
+        <Text type="secondary">OpenAI의 GPT를 사용하여 창의적이고 다양한 콘텐츠를 생성합니다</Text>
       </div>
 
-      {/* 통계 카드 */}
-      {stats && (
-        <Card style={{ marginBottom: 24 }}>
-          <Row gutter={16}>
-            <Col span={6}>
-              <Statistic
-                title="총 테스트 수"
-                value={stats.totalTests}
-                prefix={<RocketOutlined />}
-              />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="성공률"
-                value={stats.successRate}
-                suffix="%"
-                precision={1}
-                valueStyle={{ 
-                  color: stats.successRate >= 90 ? '#3f8600' : 
-                          stats.successRate >= 70 ? '#faad14' : '#cf1322' 
-                }}
-              />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="평균 응답시간"
-                value={stats.avgResponseTime}
-                suffix="ms"
-                precision={0}
-              />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="실패 횟수"
-                value={stats.failedTests}
-                valueStyle={{ color: stats.failedTests > 0 ? '#cf1322' : '#3f8600' }}
-              />
-            </Col>
-          </Row>
-        </Card>
-      )}
-
       <Row gutter={[24, 24]}>
-        {/* API 테스트 섹션 */}
-        <Col span={12}>
-          <Card 
-            title={
-              <Space>
-                <CheckCircleOutlined />
-                <span>API 연결 테스트</span>
-              </Space>
-            }
-          >
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <div>
-                <Text strong>프리셋 프롬프트</Text>
-                <Select
-                  style={{ width: '100%', marginTop: 8 }}
-                  placeholder="프리셋 선택 (선택사항)"
-                  allowClear
-                  onChange={(value) => setTestPrompt(value || '')}
-                >
-                  {presetPrompts.map((preset, index) => (
-                    <Option key={index} value={preset.value}>
-                      {preset.label}
-                    </Option>
-                  ))}
-                </Select>
-              </div>
-
-              <div>
-                <Text strong>테스트 프롬프트</Text>
-                <TextArea
-                  placeholder="OpenAI GPT에게 보낼 메시지를 입력하세요"
-                  value={testPrompt}
-                  onChange={(e) => setTestPrompt(e.target.value)}
-                  rows={4}
-                  maxLength={1000}
-                  showCount
-                  style={{ marginTop: 8 }}
-                />
-              </div>
-
-              <Button
-                type="primary"
-                icon={<PlayCircleOutlined />}
-                onClick={runTest}
-                loading={isTestLoading}
-                disabled={!testPrompt.trim()}
-                style={{ width: '100%', backgroundColor: '#00A67E', borderColor: '#00A67E' }}
-                size="large"
-              >
-                {isTestLoading ? '테스트 실행 중...' : 'OpenAI API 테스트'}
-              </Button>
-            </Space>
+        <Col span={8}>
+          <Card>
+            <Statistic
+              title="모델"
+              value="GPT-4o"
+              prefix={<RocketOutlined />}
+              valueStyle={{ color: '#00A67E' }}
+            />
           </Card>
         </Col>
-
-        {/* 콘텐츠 생성 섹션 */}
-        <Col span={12}>
-          <Card 
-            title={
-              <Space>
-                <FileTextOutlined />
-                <span>콘텐츠 생성</span>
-              </Space>
-            }
-          >
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <div>
-                <Text strong>생성 주제</Text>
-                <Input
-                  placeholder="생성할 콘텐츠의 주제를 입력하세요"
-                  value={generationTopic}
-                  onChange={(e) => setGenerationTopic(e.target.value)}
-                  maxLength={200}
-                  showCount
-                  style={{ marginTop: 8 }}
-                />
-              </div>
-
-              <Row gutter={12}>
-                <Col span={12}>
-                  <Text strong>톤앤매너</Text>
-                  <Select
-                    style={{ width: '100%', marginTop: 8 }}
-                    value={generationTone}
-                    onChange={setGenerationTone}
-                  >
-                    <Option value="professional">전문적</Option>
-                    <Option value="casual">캐주얼</Option>
-                    <Option value="friendly">친근한</Option>
-                    <Option value="academic">학술적</Option>
-                    <Option value="conversational">대화형</Option>
-                  </Select>
-                </Col>
-                <Col span={12}>
-                  <Text strong>목표 단어 수</Text>
-                  <Select
-                    style={{ width: '100%', marginTop: 8 }}
-                    value={wordCount}
-                    onChange={setWordCount}
-                  >
-                    <Option value={300}>300자</Option>
-                    <Option value={500}>500자</Option>
-                    <Option value={800}>800자</Option>
-                    <Option value={1000}>1000자</Option>
-                    <Option value={1500}>1500자</Option>
-                  </Select>
-                </Col>
-              </Row>
-
-              <Button
-                type="primary"
-                icon={<FileTextOutlined />}
-                onClick={generateContent}
-                loading={isGenerating}
-                disabled={!generationTopic.trim()}
-                style={{ width: '100%', backgroundColor: '#00A67E', borderColor: '#00A67E' }}
-                size="large"
-              >
-                {isGenerating ? '생성 중...' : '콘텐츠 생성 시작'}
-              </Button>
-            </Space>
+        <Col span={8}>
+          <Card>
+            <Statistic
+              title="최대 토큰"
+              value="128K"
+              prefix={<ThunderboltOutlined />}
+              valueStyle={{ color: '#10A37F' }}
+            />
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card>
+            <Statistic
+              title="창의성"
+              value="높음"
+              valueStyle={{ color: '#1A7F64' }}
+            />
           </Card>
         </Col>
       </Row>
 
-      <Divider />
-
-      {/* 테스트 결과 테이블 */}
       <Card 
-        title="최근 테스트 결과" 
-        extra={
-          <Button onClick={loadTestResults} icon={<RocketOutlined />}>
-            새로고침
-          </Button>
+        title={
+          <Space>
+            <ExperimentOutlined style={{ color: '#00A67E' }} />
+            새로운 콘텐츠 생성
+          </Space>
         }
-        style={{ marginBottom: 24 }}
+        style={{ marginTop: 24 }}
       >
-        <Table
-          columns={testResultColumns}
-          dataSource={testResults}
-          rowKey="id"
-          pagination={{ pageSize: 10 }}
-          size="middle"
-        />
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleGenerate}
+          initialValues={{
+            provider: 'openai',
+            tone: 'creative',
+            word_count: 800,
+            include_images: true,
+            target_language: 'ko',
+          }}
+        >
+          <Form.Item name="provider" hidden>
+            <Input value="openai" />
+          </Form.Item>
+
+          <Form.Item
+            name="topic"
+            label="주제"
+            rules={[
+              { required: true, message: '주제를 입력해주세요.' },
+              { min: 10, message: '주제는 최소 10자 이상이어야 합니다.' },
+            ]}
+          >
+            <TextArea
+              rows={3}
+              placeholder="OpenAI GPT로 생성할 콘텐츠의 주제를 구체적으로 입력해주세요. 예: '스타트업을 위한 혁신적인 마케팅 전략과 실용적인 실행 방법'"
+            />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="tone" label="톤 앤 매너">
+                <Select>
+                  <Select.Option value="creative">창의적</Select.Option>
+                  <Select.Option value="professional">전문적</Select.Option>
+                  <Select.Option value="casual">캐주얼</Select.Option>
+                  <Select.Option value="friendly">친근한</Select.Option>
+                  <Select.Option value="conversational">대화형</Select.Option>
+                  <Select.Option value="persuasive">설득적</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="word_count" label="목표 단어 수">
+                <InputNumber
+                  min={300}
+                  max={3000}
+                  step={100}
+                  style={{ width: '100%' }}
+                  placeholder="800"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="target_language" label="언어">
+                <Select>
+                  <Select.Option value="ko">한국어</Select.Option>
+                  <Select.Option value="en">영어</Select.Option>
+                  <Select.Option value="ja">일본어</Select.Option>
+                  <Select.Option value="zh">중국어</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="include_images" label="이미지 포함" valuePropName="checked">
+                <Switch />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item style={{ marginTop: 32 }}>
+            <Space size="large">
+              <Button
+                type="primary"
+                htmlType="submit"
+                icon={<SendOutlined />}
+                loading={loading}
+                size="large"
+                style={{ 
+                  background: 'linear-gradient(135deg, #00A67E, #10A37F)',
+                  border: 'none',
+                  minWidth: '200px'
+                }}
+              >
+                OpenAI로 생성 시작
+              </Button>
+              <Button size="large" onClick={() => form.resetFields()}>
+                초기화
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
       </Card>
 
-      {/* 생성 작업 테이블 */}
+      {/* Job Status Display */}
+      {currentJob && (
+        <Card 
+          title={
+            <Space>
+              <ExperimentOutlined style={{ color: '#00A67E' }} />
+              생성 진행 상황
+            </Space>
+          } 
+          style={{ marginTop: 24 }}
+        >
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <div>
+              <Text strong>Job ID: </Text>
+              <Text code>{currentJob}</Text>
+            </div>
+            <div>
+              <Text strong>상태: </Text>
+              <Text>{jobStatus?.status || 'Starting...'}</Text>
+            </div>
+            <div>
+              <Text strong>메시지: </Text>
+              <Text>{jobStatus?.message || 'Initializing...'}</Text>
+            </div>
+            <Progress 
+              percent={progress} 
+              status={loading ? 'active' : 'normal'}
+              strokeColor={{
+                '0%': '#00A67E',
+                '100%': '#10A37F'
+              }}
+            />
+          </Space>
+        </Card>
+      )}
+
+      {/* Generation Result Display */}
+      {(jobStatus?.result || jobStatus?.content) && (
+        <Card 
+          title={
+            <Space>
+              <EyeOutlined style={{ color: '#10A37F' }} />
+              생성된 콘텐츠
+            </Space>
+          }
+          style={{ marginTop: 24 }}
+          extra={
+            <Space>
+              <Button type="primary">편집</Button>
+              <Button>저장</Button>
+            </Space>
+          }
+        >
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <div>
+              <Title level={3}>
+                {jobStatus.result?.title || jobStatus.content?.title || '생성된 콘텐츠'}
+              </Title>
+            </div>
+            
+            {(jobStatus.content?.summary || jobStatus.result?.contentPreview) && (
+              <Alert
+                message="요약"
+                description={jobStatus.content?.summary || jobStatus.result?.contentPreview}
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+              />
+            )}
+
+            <div 
+              style={{ 
+                border: '1px solid #e1e5e9',
+                borderRadius: '8px',
+                padding: '24px',
+                maxHeight: '800px',
+                overflow: 'auto',
+                background: '#ffffff',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                color: '#333'
+              }}
+              className="generated-content"
+            >
+              <style>{`
+                .generated-content h1 { 
+                  font-size: 2.2em; 
+                  font-weight: 700; 
+                  margin-bottom: 0.5em; 
+                  color: #1a1a1a; 
+                  line-height: 1.3;
+                }
+                .generated-content h2 { 
+                  font-size: 1.6em; 
+                  font-weight: 600; 
+                  margin: 1.5em 0 0.8em; 
+                  color: #2c3e50; 
+                  line-height: 1.4;
+                }
+                .generated-content h3 { 
+                  font-size: 1.3em; 
+                  font-weight: 500; 
+                  margin: 1.2em 0 0.6em; 
+                  color: #34495e; 
+                  line-height: 1.4;
+                }
+                .generated-content p { 
+                  margin-bottom: 1.2em; 
+                  line-height: 1.7; 
+                  color: #333;
+                  font-size: 15px;
+                }
+                .generated-content ul, .generated-content ol { 
+                  margin-bottom: 1.2em; 
+                  padding-left: 1.5em; 
+                }
+                .generated-content li { 
+                  margin-bottom: 0.5em; 
+                  line-height: 1.6;
+                }
+                .generated-content figure { 
+                  margin: 2em 0; 
+                  text-align: center; 
+                }
+                .generated-content img { 
+                  max-width: 100%; 
+                  height: auto; 
+                  border-radius: 8px; 
+                  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                }
+                .generated-content figcaption { 
+                  margin-top: 0.8em; 
+                  font-style: italic; 
+                  color: #666; 
+                  font-size: 14px;
+                }
+                .generated-content aside { 
+                  background: #f8f9fa; 
+                  padding: 1.5em; 
+                  border-radius: 8px; 
+                  margin: 1.5em 0; 
+                  border-left: 4px solid #10a37f;
+                }
+                .generated-content aside h3 { 
+                  margin-top: 0; 
+                  color: #10a37f;
+                }
+                .generated-content aside ul { 
+                  margin-bottom: 0; 
+                }
+                .generated-content a { 
+                  color: #10a37f; 
+                  text-decoration: none; 
+                }
+                .generated-content a:hover { 
+                  text-decoration: underline; 
+                }
+              `}</style>
+              <div 
+                style={{ color: '#333' }}
+                dangerouslySetInnerHTML={{ 
+                  __html: jobStatus.content?.content || jobStatus.content || '<p>콘텐츠 로딩 중...</p>' 
+                }}
+              />
+            </div>
+
+            {jobStatus.content?.tags && jobStatus.content.tags.length > 0 && (
+              <div>
+                <Text strong>태그: </Text>
+                <Space wrap>
+                  {jobStatus.content.tags.map((tag, index) => (
+                    <span key={index} style={{
+                      background: 'rgba(0, 166, 126, 0.15)',
+                      color: '#00A67E',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '12px'
+                    }}>
+                      #{tag}
+                    </span>
+                  ))}
+                </Space>
+              </div>
+            )}
+
+            {jobStatus.result && (
+              <div>
+                <Text strong>통계: </Text>
+                <Space>
+                  <Text type="secondary">단어 수: {jobStatus.result.wordCount}</Text>
+                  <Divider type="vertical" />
+                  <Text type="secondary">SEO 점수: {jobStatus.result.seoScore}</Text>
+                </Space>
+              </div>
+            )}
+          </Space>
+        </Card>
+      )}
+
       <Card 
-        title="콘텐츠 생성 기록"
+        title={
+          <Space>
+            <HistoryOutlined style={{ color: '#00A67E' }} />
+            OpenAI 생성 히스토리
+          </Space>
+        }
+        style={{ marginTop: 24 }}
         extra={
-          <Button onClick={loadGenerationJobs} icon={<FileTextOutlined />}>
+          <Button type="link" onClick={loadHistory} loading={historyLoading}>
             새로고침
           </Button>
         }
       >
-        <Table
-          columns={generationJobColumns}
-          dataSource={generationJobs}
-          rowKey="jobId"
-          pagination={{ pageSize: 10 }}
-          size="middle"
-          expandable={{
-            expandedRowRender: (record: GenerationJob) => (
-              <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
-                {record.content ? (
-                  <div>
-                    <Text strong>생성된 콘텐츠:</Text>
-                    <Paragraph style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>
-                      {record.content}
-                    </Paragraph>
-                  </div>
-                ) : record.errorMessage ? (
-                  <Alert
-                    message="생성 실패"
-                    description={record.errorMessage}
-                    type="error"
-                    showIcon
-                  />
-                ) : (
-                  <Text type="secondary">아직 콘텐츠가 생성되지 않았습니다.</Text>
+        {historyJobs.length === 0 ? (
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '40px 0', 
+            color: '#a6a6a6' 
+          }}>
+            아직 OpenAI로 생성된 콘텐츠가 없습니다.
+          </div>
+        ) : (
+          <List
+            dataSource={historyJobs}
+            renderItem={(job: any) => (
+              <List.Item>
+                <List.Item.Meta
+                  title={
+                    <Space>
+                      <Text strong>{job.topic}</Text>
+                      <Tag color={
+                        job.status === 'completed' ? 'success' :
+                        job.status === 'failed' ? 'error' :
+                        job.status === 'in_progress' ? 'processing' : 'default'
+                      }>
+                        {job.status}
+                      </Tag>
+                    </Space>
+                  }
+                  description={
+                    <Space direction="vertical" size="small">
+                      <Space>
+                        <ClockCircleOutlined />
+                        <Text type="secondary">
+                          {new Date(job.createdAt).toLocaleString('ko-KR')}
+                        </Text>
+                        <Divider type="vertical" />
+                        <Text type="secondary">톤: {job.tone}</Text>
+                        <Divider type="vertical" />
+                        <Text type="secondary">목표: {job.wordCount}자</Text>
+                      </Space>
+                      {job.content && (
+                        <Text type="secondary" ellipsis>
+                          {job.content.length > 100 ? job.content.substring(0, 100) + '...' : job.content}
+                        </Text>
+                      )}
+                      {job.errorMessage && (
+                        <Text type="danger">{job.errorMessage}</Text>
+                      )}
+                    </Space>
+                  }
+                />
+                {job.status === 'completed' && job.content && (
+                  <Button 
+                    type="primary" 
+                    size="small"
+                    onClick={() => {
+                      setJobStatus({
+                        ...job,
+                        result: {
+                          bundleId: `bundle_${job.jobId}`,
+                          title: job.topic,
+                          contentPreview: job.content,
+                          wordCount: job.content ? job.content.split(' ').length : 0,
+                          imagesCount: 0,
+                          seoScore: 85
+                        }
+                      })
+                    }}
+                  >
+                    보기
+                  </Button>
                 )}
-              </div>
-            ),
-          }}
-        />
+              </List.Item>
+            )}
+          />
+        )}
       </Card>
     </div>
-  );
-};
+  )
+}
 
-export default OpenAIPage;
+export default OpenAIPage
