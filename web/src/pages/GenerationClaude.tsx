@@ -330,7 +330,7 @@ const GenerationClaude: React.FC = () => {
                   font-size: 1.6em; 
                   font-weight: 600; 
                   margin: 1.5em 0 0.8em; 
-                  color: #2c3e50; 
+                  color: #000000; 
                   line-height: 1.4;
                 }
                 .generated-content h3 { 

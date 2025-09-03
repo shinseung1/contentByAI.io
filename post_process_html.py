@@ -18,7 +18,7 @@ def fix_white_text_in_html(html_content: str) -> str:
     ]
     
     # Default replacement color (dark gray)
-    replacement_color = '#2c3e50'
+    replacement_color = '#000000'
     
     # Replace all white/light colors
     fixed_html = html_content

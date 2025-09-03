@@ -492,7 +492,7 @@ HTML 작성 규칙 (브런치 스타일):
 2. HTML 버전과 마크다운 버전 모두 제공하세요
 {image_instructions}4. HTML에는 인라인 스타일을 적용하세요
 5. 제목은 빨간색(#e74c3c), 부제목은 파란색(#3498db), 소제목은 녹색(#27ae60)으로 
-6. 본문은 진한 회색(#2c3e50), 강조는 주황색(#e67e22)으로 색칠하세요
+6. 본문은 진한 회색(#000000), 강조는 주황색(#e67e22)으로 색칠하세요
 7. 완전한 HTML 구조로 작성하여 웹페이지에 바로 표시 가능하게 만드세요
 8. 절대 흰색(#ffffff, #fff, white)이나 매우 밝은 색상은 사용하지 마세요
 9. **반드시 관련페이지링크를 포함하세요**: 각 섹션에 "소제목 바로가기" 형태의 링크 버튼을 추가해야 합니다"""
@@ -596,8 +596,8 @@ HTML 작성 규칙 (브런치 스타일):
             r'color:\s*rgb\(\s*25[0-5],\s*25[0-5],\s*25[0-5]\s*\)',  # RGB white/near-white
         ]
         
-        # Default replacement color (dark gray)
-        replacement_color = '#2c3e50'
+        # Default replacement color (black)
+        replacement_color = '#000000'
         
         # Replace all white/light colors
         fixed_html = html_content
