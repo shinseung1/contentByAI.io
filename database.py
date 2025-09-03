@@ -62,6 +62,8 @@ class GenerationJob:
     status: str = "pending"  # pending, in_progress, completed, failed
     progress: int = 0
     content: Optional[str] = None
+    html_content: Optional[str] = None
+    markdown_content: Optional[str] = None
     error_message: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
@@ -133,6 +135,8 @@ class DatabaseManager:
                     status TEXT NOT NULL DEFAULT 'pending',
                     progress INTEGER NOT NULL DEFAULT 0,
                     content TEXT,
+                    html_content TEXT,
+                    markdown_content TEXT,
                     error_message TEXT,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -273,8 +277,8 @@ class DatabaseManager:
             cursor = conn.execute("""
                 INSERT OR REPLACE INTO generation_jobs 
                 (job_id, provider, topic, tone, word_count, include_images, target_language, 
-                 status, progress, content, error_message, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 status, progress, content, html_content, markdown_content, error_message, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 job.job_id,
                 job.provider,
@@ -286,6 +290,8 @@ class DatabaseManager:
                 job.status,
                 job.progress,
                 job.content,
+                job.html_content,
+                job.markdown_content,
                 job.error_message,
                 job.created_at or datetime.now().isoformat(),
                 datetime.now().isoformat()
@@ -315,6 +321,8 @@ class DatabaseManager:
                     status=row['status'],
                     progress=row['progress'],
                     content=row['content'],
+                    html_content=row['html_content'] if 'html_content' in row.keys() else None,
+                    markdown_content=row['markdown_content'] if 'markdown_content' in row.keys() else None,
                     error_message=row['error_message'],
                     created_at=row['created_at'],
                     updated_at=row['updated_at']
@@ -356,6 +364,8 @@ class DatabaseManager:
                     status=row['status'],
                     progress=row['progress'],
                     content=row['content'],
+                    html_content=row['html_content'] if 'html_content' in row.keys() else None,
+                    markdown_content=row['markdown_content'] if 'markdown_content' in row.keys() else None,
                     error_message=row['error_message'],
                     created_at=row['created_at'],
                     updated_at=row['updated_at']

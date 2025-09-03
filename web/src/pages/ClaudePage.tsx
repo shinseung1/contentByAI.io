@@ -20,6 +20,12 @@ const ClaudePage: React.FC = () => {
     setHistoryLoading(true)
     try {
       const jobs = await api.listGenerationJobs('claude')
+      console.log('Received jobs in ClaudePage:', jobs)
+      console.log('Jobs type:', typeof jobs)
+      console.log('Jobs is array:', Array.isArray(jobs))
+      if (jobs && typeof jobs === 'object' && !Array.isArray(jobs)) {
+        console.log('Jobs keys:', Object.keys(jobs))
+      }
       setHistoryJobs(jobs)
     } catch (error) {
       console.error('Failed to load history:', error)
@@ -295,10 +301,14 @@ const ClaudePage: React.FC = () => {
               </Title>
             </div>
             
-            {(jobStatus.content?.summary || jobStatus.result?.contentPreview) && (
+            {(jobStatus.content?.summary || jobStatus.content?.markdown_content || jobStatus.result?.contentPreview) && (
               <Alert
-                message="요약"
-                description={jobStatus.content?.summary || jobStatus.result?.contentPreview}
+                message="요약 (마크다운)"
+                description={
+                  <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                    {jobStatus.content?.summary || jobStatus.content?.markdown_content || jobStatus.result?.contentPreview}
+                  </div>
+                }
                 type="info"
                 showIcon
                 style={{ marginBottom: 16 }}
@@ -306,6 +316,7 @@ const ClaudePage: React.FC = () => {
             )}
 
             <div 
+              className="generated-content"
               style={{ 
                 border: '1px solid #e1e5e9',
                 borderRadius: '8px',
@@ -314,88 +325,13 @@ const ClaudePage: React.FC = () => {
                 overflow: 'auto',
                 background: '#ffffff',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                color: '#333'
+                color: '#2c3e50',
+                lineHeight: '1.7'
               }}
-              className="generated-content"
             >
-              <style>{`
-                .generated-content h1 { 
-                  font-size: 2.2em; 
-                  font-weight: 700; 
-                  margin-bottom: 0.5em; 
-                  color: #1a1a1a; 
-                  line-height: 1.3;
-                }
-                .generated-content h2 { 
-                  font-size: 1.6em; 
-                  font-weight: 600; 
-                  margin: 1.5em 0 0.8em; 
-                  color: #2c3e50; 
-                  line-height: 1.4;
-                }
-                .generated-content h3 { 
-                  font-size: 1.3em; 
-                  font-weight: 500; 
-                  margin: 1.2em 0 0.6em; 
-                  color: #34495e; 
-                  line-height: 1.4;
-                }
-                .generated-content p { 
-                  margin-bottom: 1.2em; 
-                  line-height: 1.7; 
-                  color: #333;
-                  font-size: 15px;
-                }
-                .generated-content ul, .generated-content ol { 
-                  margin-bottom: 1.2em; 
-                  padding-left: 1.5em; 
-                }
-                .generated-content li { 
-                  margin-bottom: 0.5em; 
-                  line-height: 1.6;
-                }
-                .generated-content figure { 
-                  margin: 2em 0; 
-                  text-align: center; 
-                }
-                .generated-content img { 
-                  max-width: 100%; 
-                  height: auto; 
-                  border-radius: 8px; 
-                  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                }
-                .generated-content figcaption { 
-                  margin-top: 0.8em; 
-                  font-style: italic; 
-                  color: #666; 
-                  font-size: 14px;
-                }
-                .generated-content aside { 
-                  background: #f8f9fa; 
-                  padding: 1.5em; 
-                  border-radius: 8px; 
-                  margin: 1.5em 0; 
-                  border-left: 4px solid #d97706;
-                }
-                .generated-content aside h3 { 
-                  margin-top: 0; 
-                  color: #d97706;
-                }
-                .generated-content aside ul { 
-                  margin-bottom: 0; 
-                }
-                .generated-content a { 
-                  color: #d97706; 
-                  text-decoration: none; 
-                }
-                .generated-content a:hover { 
-                  text-decoration: underline; 
-                }
-              `}</style>
               <div 
-                style={{ color: '#333' }}
                 dangerouslySetInnerHTML={{ 
-                  __html: jobStatus.content?.content || jobStatus.content || '<p>콘텐츠 로딩 중...</p>' 
+                  __html: (typeof jobStatus.content === 'string' ? jobStatus.content : jobStatus.content?.content) || '<p style="color: #2c3e50;">콘텐츠 로딩 중...</p>' 
                 }}
               />
             </div>
@@ -463,7 +399,7 @@ const ClaudePage: React.FC = () => {
                 <List.Item.Meta
                   title={
                     <Space>
-                      <Text strong>{job.topic}</Text>
+                      <Text strong>{job.message || '제목 없음'}</Text>
                       <Tag color={
                         job.status === 'completed' ? 'success' :
                         job.status === 'failed' ? 'error' :
@@ -478,20 +414,29 @@ const ClaudePage: React.FC = () => {
                       <Space>
                         <ClockCircleOutlined />
                         <Text type="secondary">
-                          {new Date(job.createdAt).toLocaleString('ko-KR')}
+                          {job.created_at ? new Date(job.created_at).toLocaleString('ko-KR') : '날짜 없음'}
                         </Text>
                         <Divider type="vertical" />
-                        <Text type="secondary">톤: {job.tone}</Text>
+                        <Text type="secondary">상태: {job.status}</Text>
                         <Divider type="vertical" />
-                        <Text type="secondary">목표: {job.wordCount}자</Text>
+                        <Text type="secondary">진행률: {Math.round((job.progress || 0) * 100)}%</Text>
                       </Space>
-                      {job.content && (
-                        <Text type="secondary" ellipsis>
-                          {job.content.length > 100 ? job.content.substring(0, 100) + '...' : job.content}
-                        </Text>
+                      <Space>
+                        <Text type="secondary">톤: {job.tone || '정보 없음'}</Text>
+                        <Divider type="vertical" />
+                        <Text type="secondary">목표: {job.word_count || 0}자</Text>
+                      </Space>
+                      {job.content?.content && typeof job.content.content === 'string' && (
+                        <div>
+                          <Text type="secondary">
+                            {job.content.content.replace(/<[^>]*>/g, '').substring(0, 100)}...
+                          </Text>
+                        </div>
                       )}
-                      {job.errorMessage && (
-                        <Text type="danger">{job.errorMessage}</Text>
+                      {job.error && (
+                        <div>
+                          <Text type="danger">{job.error}</Text>
+                        </div>
                       )}
                     </Space>
                   }
@@ -504,11 +449,11 @@ const ClaudePage: React.FC = () => {
                       setJobStatus({
                         ...job,
                         result: {
-                          bundleId: `bundle_${job.jobId}`,
-                          title: job.topic,
-                          contentPreview: job.content,
-                          wordCount: job.content ? job.content.split(' ').length : 0,
-                          imagesCount: 0,
+                          bundleId: `bundle_${job.job_id}`,
+                          title: job.message,
+                          contentPreview: job.content?.content || '',
+                          wordCount: job.content?.content ? job.content.content.split(' ').length : 0,
+                          imagesCount: job.content?.images?.length || 0,
                           seoScore: 85
                         }
                       })

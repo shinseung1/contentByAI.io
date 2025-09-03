@@ -1,11 +1,10 @@
 """Content generation models."""
 
-from typing import Optional, List
+from typing import Optional, List, Union, Dict, Any
 from enum import Enum
 from datetime import datetime
 from pydantic import BaseModel, Field
-from sqlalchemy import Column, String, DateTime, JSON, Text, Integer, Float
-from sqlalchemy.sql import func
+from sqlalchemy import Column, String, Text, Integer
 
 from packages.core.database import Base
 
@@ -28,13 +27,60 @@ class GenerationRequest(BaseModel):
     target_language: str = Field("ko", max_length=10, description="Target language code")
 
 
+class ImageInfo(dict):
+    """ImageInfo that inherits from dict to be JSON serializable."""
+    def __init__(self, url: str = "", alt: str = "", caption: str = "", **kwargs):
+        super().__init__()
+        self.update({
+            "url": url,
+            "alt": alt,
+            "caption": caption,
+            **kwargs
+        })
+    
+    # Add properties for compatibility
+    @property
+    def url(self):
+        return self.get("url", "")
+    
+    @property
+    def alt(self):
+        return self.get("alt", "")
+    
+    @property
+    def caption(self):
+        return self.get("caption", "")
+
+# Also create the function for backward compatibility
+def create_image_info(url: str = "", alt: str = "", caption: str = "", **kwargs) -> dict:
+    """Create image info as ImageInfo object (which is a dict)."""
+    return ImageInfo(url=url, alt=alt, caption=caption, **kwargs)
+
+
 class GeneratedContent(BaseModel):
     """Generated content model."""
     title: str = Field(..., description="Content title")
-    content: str = Field(..., description="Main content body")
+    content: str = Field(..., description="Main content body (HTML)")
+    markdown_content: Optional[str] = Field(None, description="Markdown version of content")
     summary: Optional[str] = Field(None, description="Content summary")
     tags: List[str] = Field(default_factory=list, description="Content tags")
-    images: List[str] = Field(default_factory=list, description="Image URLs or paths")
+    images: List[Dict[str, Any]] = Field(default_factory=list, description="Related images")
+    
+    def __init__(self, **data):
+        # Convert any ImageInfo objects to ensure they're JSON serializable
+        if 'images' in data and data['images']:
+            processed_images = []
+            for img in data['images']:
+                if isinstance(img, dict):
+                    processed_images.append(img)
+                elif hasattr(img, 'url'):  # ImageInfo-like object
+                    processed_images.append({
+                        "url": str(img.url) if hasattr(img, 'url') else "",
+                        "alt": str(img.alt) if hasattr(img, 'alt') else "",
+                        "caption": str(img.caption) if hasattr(img, 'caption') else ""
+                    })
+            data['images'] = processed_images
+        super().__init__(**data)
 
 
 class GenerationResponse(BaseModel):
@@ -54,26 +100,19 @@ class GenerationJob(Base):
     """Content generation job database model."""
     __tablename__ = "generation_jobs"
 
-    id = Column(String, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(String, unique=True, nullable=False, index=True)
+    provider = Column(String, nullable=False)
     topic = Column(String, nullable=False, index=True)
-    tone = Column(String, nullable=True)
-    word_count = Column(Integer, nullable=True)
-    include_images = Column(String, nullable=True)  # Store as string for boolean
+    tone = Column(String, nullable=False, default="professional")
+    word_count = Column(Integer, nullable=False, default=800)
+    include_images = Column(String, nullable=False, default="1")  # SQLite boolean as string
     target_language = Column(String, nullable=False, default="ko")
     
     status = Column(String, nullable=False, default=GenerationStatus.PENDING)
-    progress = Column(Float, nullable=True)
-    message = Column(String, nullable=True)
+    progress = Column(Integer, nullable=False, default=0)
+    content = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
     
-    created_at = Column(DateTime, nullable=False, default=func.now())
-    completed_at = Column(DateTime, nullable=True)
-    
-    # Generated content
-    generated_title = Column(String, nullable=True)
-    generated_content = Column(Text, nullable=True)
-    generated_summary = Column(Text, nullable=True)
-    generated_tags = Column(JSON, nullable=True)
-    generated_images = Column(JSON, nullable=True)
-    
-    job_metadata = Column(JSON, nullable=True)
+    created_at = Column(String, nullable=False, default=lambda: datetime.now().isoformat())
+    updated_at = Column(String, nullable=False, default=lambda: datetime.now().isoformat())

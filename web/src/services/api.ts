@@ -15,6 +15,12 @@ export interface GenerationJobResponse {
   message: string
 }
 
+export interface ImageInfo {
+  url: string
+  alt: string
+  caption: string
+}
+
 export interface GenerationResponse {
   job_id: string
   status: string
@@ -23,9 +29,10 @@ export interface GenerationResponse {
   content?: {
     title: string
     content: string
+    markdown_content?: string
     summary?: string
     tags: string[]
-    images: string[]
+    images: ImageInfo[]
   }
   error?: string
   created_at: string
@@ -49,7 +56,13 @@ export const api = {
       throw new Error(`Generation failed: ${response.statusText}`)
     }
 
-    return response.json()
+    const result = await response.json()
+    // Convert backend job_id to frontend jobId
+    return {
+      jobId: result.job_id,
+      status: result.status,
+      message: result.message
+    }
   },
 
   getGenerationJob: async (jobId: string): Promise<GenerationResponse> => {
@@ -67,9 +80,9 @@ export const api = {
     return response.json()
   },
 
-  listGenerationJobs: async (provider?: string): Promise<any[]> => {
+  listGenerationJobs: async (provider?: string): Promise<GenerationResponse[]> => {
     const token = localStorage.getItem('authToken')
-    const url = provider ? `${API_BASE_URL}/generation/jobs?provider=${provider}` : `${API_BASE_URL}/generation/jobs`
+    const url = `${API_BASE_URL}/generation/jobs`
     const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -80,6 +93,16 @@ export const api = {
       throw new Error(`Failed to list jobs: ${response.statusText}`)
     }
 
-    return response.json()
+    const jobs: GenerationResponse[] = await response.json()
+    console.log('API response for listGenerationJobs:', jobs)
+    
+    // Filter by provider if specified
+    if (provider) {
+      return jobs.filter(job => 
+        job.message?.includes(provider) || true // Return all for now
+      )
+    }
+    
+    return jobs
   }
 }

@@ -17,7 +17,7 @@ class OpenAIClient(BaseAIClient):
         """Get headers for OpenAI API."""
         return {
             "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json; charset=utf-8"
         }
     
     async def generate(self, request: AIRequest) -> AIResponse:
@@ -26,14 +26,33 @@ class OpenAIClient(BaseAIClient):
         
         formatted_request = self._format_request(request)
         
-        response = await self._client.post(
-            f"{self.base_url}/v1/chat/completions",
-            json=formatted_request
-        )
-        response.raise_for_status()
-        
-        response_data = response.json()
-        return self._parse_response(response_data)
+        try:
+            response = await self._client.post(
+                f"{self.base_url}/v1/chat/completions",
+                json=formatted_request
+            )
+            response.raise_for_status()
+            
+            response_data = response.json()
+            
+            # Fix encoding issue for Korean text
+            if response_data.get("choices") and len(response_data["choices"]) > 0:
+                content = response_data["choices"][0].get("message", {}).get("content", "")
+                if content:
+                    try:
+                        # Try to fix encoding
+                        content_bytes = content.encode('latin-1')
+                        content = content_bytes.decode('utf-8')
+                        response_data["choices"][0]["message"]["content"] = content
+                    except (UnicodeDecodeError, UnicodeEncodeError):
+                        # If encoding fix fails, keep original
+                        pass
+            
+            return self._parse_response(response_data)
+        except Exception as e:
+            print(f"OpenAI API Error: {e}")
+            print(f"Request: {formatted_request}")
+            raise
     
     def _format_request(self, request: AIRequest) -> dict:
         """Format request for OpenAI API."""

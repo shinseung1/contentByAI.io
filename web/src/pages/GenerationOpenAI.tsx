@@ -485,9 +485,17 @@ const GenerationOpenAI: React.FC = () => {
                         <Text type="secondary">목표: {job.wordCount}자</Text>
                       </Space>
                       {job.content && (
-                        <Text type="secondary" ellipsis>
-                          {job.content.length > 100 ? job.content.substring(0, 100) + '...' : job.content}
-                        </Text>
+                        <div>
+                          <Text type="secondary">
+                            {typeof job.content === 'string' 
+                              ? (job.content.length > 100 ? job.content.substring(0, 100) + '...' : job.content)
+                              : (job.content?.content && typeof job.content.content === 'string'
+                                ? (job.content.content.length > 100 ? job.content.content.substring(0, 100) + '...' : job.content.content)
+                                : '콘텐츠 미리보기 불가'
+                              )
+                            }
+                          </Text>
+                        </div>
                       )}
                       {job.errorMessage && (
                         <Text type="danger">{job.errorMessage}</Text>
@@ -505,9 +513,9 @@ const GenerationOpenAI: React.FC = () => {
                         result: {
                           bundleId: `bundle_${job.jobId}`,
                           title: job.topic,
-                          contentPreview: job.content,
-                          wordCount: job.content ? job.content.split(' ').length : 0,
-                          imagesCount: 0,
+                          contentPreview: typeof job.content === 'string' ? job.content : job.content?.content || '',
+                          wordCount: typeof job.content === 'string' ? job.content.split(' ').length : (job.content?.content ? job.content.content.split(' ').length : 0),
+                          imagesCount: job.content?.images?.length || 0,
                           seoScore: 85
                         }
                       })
