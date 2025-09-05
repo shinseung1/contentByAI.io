@@ -314,45 +314,57 @@ const GenerationOpenAI: React.FC = () => {
                 maxHeight: '800px',
                 overflow: 'auto',
                 background: '#ffffff',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                color: '#000000'
               }}
               className="generated-content"
             >
               <style>{`
+                .generated-content, .generated-content * { 
+                  color: #000000 !important; 
+                }
                 .generated-content h1 { 
                   font-size: 2.2em; 
                   font-weight: 700; 
                   margin-bottom: 0.5em; 
-                  color: #1a1a1a; 
+                  color: #000000 !important; 
                   line-height: 1.3;
                 }
                 .generated-content h2 { 
                   font-size: 1.6em; 
                   font-weight: 600; 
                   margin: 1.5em 0 0.8em; 
-                  color: #2c3e50; 
+                  color: #000000 !important; 
                   line-height: 1.4;
                 }
                 .generated-content h3 { 
                   font-size: 1.3em; 
                   font-weight: 500; 
                   margin: 1.2em 0 0.6em; 
-                  color: #34495e; 
+                  color: #000000 !important; 
                   line-height: 1.4;
                 }
                 .generated-content p { 
                   margin-bottom: 1.2em; 
                   line-height: 1.7; 
-                  color: #333;
+                  color: #000000 !important;
                   font-size: 15px;
                 }
                 .generated-content ul, .generated-content ol { 
                   margin-bottom: 1.2em; 
                   padding-left: 1.5em; 
+                  color: #000000 !important;
                 }
                 .generated-content li { 
                   margin-bottom: 0.5em; 
                   line-height: 1.6;
+                  color: #000000 !important;
+                }
+                .generated-content div { 
+                  color: #000000 !important;
+                }
+                .generated-content span { 
+                  color: inherit !important;
                 }
                 .generated-content figure { 
                   margin: 2em 0; 
@@ -367,7 +379,7 @@ const GenerationOpenAI: React.FC = () => {
                 .generated-content figcaption { 
                   margin-top: 0.8em; 
                   font-style: italic; 
-                  color: #666; 
+                  color: #666 !important; 
                   font-size: 14px;
                 }
                 .generated-content aside { 
@@ -376,20 +388,30 @@ const GenerationOpenAI: React.FC = () => {
                   border-radius: 8px; 
                   margin: 1.5em 0; 
                   border-left: 4px solid #10a37f;
+                  color: #000000 !important;
                 }
                 .generated-content aside h3 { 
                   margin-top: 0; 
-                  color: #10a37f;
+                  color: #10a37f !important;
                 }
                 .generated-content aside ul { 
                   margin-bottom: 0; 
+                  color: #000000 !important;
                 }
                 .generated-content a { 
-                  color: #10a37f; 
+                  color: #3498db !important; 
                   text-decoration: none; 
                 }
                 .generated-content a:hover { 
                   text-decoration: underline; 
+                }
+                .generated-content strong { 
+                  color: #e74c3c !important;
+                  font-weight: 600;
+                }
+                .generated-content em { 
+                  color: #000000 !important;
+                  font-style: italic;
                 }
               `}</style>
               <div 
@@ -487,13 +509,20 @@ const GenerationOpenAI: React.FC = () => {
                       {job.content && (
                         <div>
                           <Text type="secondary">
-                            {typeof job.content === 'string' 
-                              ? (job.content.length > 100 ? job.content.substring(0, 100) + '...' : job.content)
-                              : (job.content?.content && typeof job.content.content === 'string'
-                                ? (job.content.content.length > 100 ? job.content.content.substring(0, 100) + '...' : job.content.content)
-                                : '콘텐츠 미리보기 불가'
-                              )
-                            }
+                            {(() => {
+                              let contentText = '';
+                              if (typeof job.content === 'string') {
+                                contentText = job.content;
+                              } else if (job.content?.content && typeof job.content.content === 'string') {
+                                contentText = job.content.content;
+                              } else {
+                                return '콘텐츠 미리보기 불가';
+                              }
+                              
+                              // Remove HTML tags and get plain text
+                              const plainText = contentText.replace(/<[^>]*>/g, '').trim();
+                              return plainText.length > 100 ? plainText.substring(0, 100) + '...' : plainText;
+                            })()}
                           </Text>
                         </div>
                       )}

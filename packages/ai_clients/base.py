@@ -28,7 +28,7 @@ class BaseAIClient(ABC):
         """Ensure HTTP client is initialized."""
         if not self._client:
             self._client = httpx.AsyncClient(
-                timeout=httpx.Timeout(self.config.timeout),
+                timeout=httpx.Timeout(connect=30.0, read=120.0, write=30.0, pool=10.0),
                 headers=self._get_headers()
             )
     

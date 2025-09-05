@@ -301,14 +301,10 @@ const ClaudePage: React.FC = () => {
               </Title>
             </div>
             
-            {(jobStatus.content?.summary || jobStatus.content?.markdown_content || jobStatus.result?.contentPreview) && (
+            {(jobStatus.content?.summary || jobStatus.result?.contentPreview) && (
               <Alert
-                message="요약 (마크다운)"
-                description={
-                  <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-                    {jobStatus.content?.summary || jobStatus.content?.markdown_content || jobStatus.result?.contentPreview}
-                  </div>
-                }
+                message="요약"
+                description={jobStatus.content?.summary || jobStatus.result?.contentPreview}
                 type="info"
                 showIcon
                 style={{ marginBottom: 16 }}
@@ -325,13 +321,108 @@ const ClaudePage: React.FC = () => {
                 overflow: 'auto',
                 background: '#ffffff',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                color: '#2c3e50',
+                color: '#000000',
                 lineHeight: '1.7'
               }}
             >
+              <style>{`
+                .generated-content, .generated-content * { 
+                  color: #000000 !important; 
+                }
+                .generated-content h1 { 
+                  font-size: 2.2em; 
+                  font-weight: 700; 
+                  margin-bottom: 0.5em; 
+                  color: #000000 !important; 
+                  line-height: 1.3;
+                }
+                .generated-content h2 { 
+                  font-size: 1.6em; 
+                  font-weight: 600; 
+                  margin: 1.5em 0 0.8em; 
+                  color: #000000 !important; 
+                  line-height: 1.4;
+                }
+                .generated-content h3 { 
+                  font-size: 1.3em; 
+                  font-weight: 500; 
+                  margin: 1.2em 0 0.6em; 
+                  color: #000000 !important; 
+                  line-height: 1.4;
+                }
+                .generated-content p { 
+                  margin-bottom: 1.2em; 
+                  line-height: 1.7; 
+                  color: #000000 !important;
+                  font-size: 15px;
+                }
+                .generated-content ul, .generated-content ol { 
+                  margin-bottom: 1.2em; 
+                  padding-left: 1.5em; 
+                  color: #000000 !important;
+                }
+                .generated-content li { 
+                  margin-bottom: 0.5em; 
+                  line-height: 1.6;
+                  color: #000000 !important;
+                }
+                .generated-content div { 
+                  color: #000000 !important;
+                }
+                .generated-content span { 
+                  color: inherit !important;
+                }
+                .generated-content figure { 
+                  margin: 2em 0; 
+                  text-align: center; 
+                }
+                .generated-content img { 
+                  max-width: 100%; 
+                  height: auto; 
+                  border-radius: 8px; 
+                  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                }
+                .generated-content figcaption { 
+                  margin-top: 0.8em; 
+                  font-style: italic; 
+                  color: #666 !important; 
+                  font-size: 14px;
+                }
+                .generated-content aside { 
+                  background: #f8f9fa; 
+                  padding: 1.5em; 
+                  border-radius: 8px; 
+                  margin: 1.5em 0; 
+                  border-left: 4px solid #8B5A2B;
+                  color: #000000 !important;
+                }
+                .generated-content aside h3 { 
+                  margin-top: 0; 
+                  color: #8B5A2B !important;
+                }
+                .generated-content aside ul { 
+                  margin-bottom: 0; 
+                  color: #000000 !important;
+                }
+                .generated-content a { 
+                  color: #3498db !important; 
+                  text-decoration: none; 
+                }
+                .generated-content a:hover { 
+                  text-decoration: underline; 
+                }
+                .generated-content strong { 
+                  color: #e74c3c !important;
+                  font-weight: 600;
+                }
+                .generated-content em { 
+                  color: #000000 !important;
+                  font-style: italic;
+                }
+              `}</style>
               <div 
                 dangerouslySetInnerHTML={{ 
-                  __html: (typeof jobStatus.content === 'string' ? jobStatus.content : jobStatus.content?.content) || '<p style="color: #2c3e50;">콘텐츠 로딩 중...</p>' 
+                  __html: (typeof jobStatus.content === 'string' ? jobStatus.content : jobStatus.content?.content) || '<p style="color: #000000;">콘텐츠 로딩 중...</p>' 
                 }}
               />
             </div>

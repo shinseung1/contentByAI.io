@@ -68,6 +68,22 @@ class GenerationJob:
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
+@dataclass  
+class ImageCache:
+    id: Optional[int] = None
+    url_hash: str = ""  # URL의 해시값
+    original_url: str = ""
+    alt_text: str = ""
+    caption: str = ""
+    image_data: bytes = b""  # 이미지 바이너리 데이터
+    mime_type: str = ""  # image/jpeg, image/png 등
+    file_size: int = 0
+    width: Optional[int] = None
+    height: Optional[int] = None
+    created_at: Optional[str] = None
+    last_accessed: Optional[str] = None
+    access_count: int = 0
+
 class DatabaseManager:
     def __init__(self, db_path: str = DATABASE_PATH):
         self.db_path = db_path
@@ -144,6 +160,24 @@ class DatabaseManager:
             """)
             
             conn.execute("""
+                CREATE TABLE IF NOT EXISTS image_cache (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    url_hash TEXT UNIQUE NOT NULL,
+                    original_url TEXT NOT NULL,
+                    alt_text TEXT NOT NULL DEFAULT '',
+                    caption TEXT NOT NULL DEFAULT '',
+                    image_data BLOB NOT NULL,
+                    mime_type TEXT NOT NULL,
+                    file_size INTEGER NOT NULL DEFAULT 0,
+                    width INTEGER,
+                    height INTEGER,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    last_accessed TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    access_count INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            
+            conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_test_results_provider 
                 ON test_results(provider)
             """)
@@ -166,6 +200,14 @@ class DatabaseManager:
                 conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_generation_jobs_status 
                     ON generation_jobs(status)
+                """)
+            except:
+                pass  # 테이블이 없으면 무시
+            
+            try:
+                conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_image_cache_url_hash 
+                    ON image_cache(url_hash)
                 """)
             except:
                 pass  # 테이블이 없으면 무시
@@ -382,6 +424,102 @@ class DatabaseManager:
                 SET status = ?, progress = ?, content = ?, error_message = ?, updated_at = ?
                 WHERE job_id = ?
             """, (status, progress, content, error_message, datetime.now().isoformat(), job_id))
+            conn.commit()
+
+    def save_image_cache(self, image_cache: ImageCache) -> int:
+        """이미지 캐시 저장"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("""
+                INSERT OR REPLACE INTO image_cache 
+                (url_hash, original_url, alt_text, caption, image_data, mime_type, 
+                 file_size, width, height, created_at, last_accessed, access_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                image_cache.url_hash,
+                image_cache.original_url,
+                image_cache.alt_text,
+                image_cache.caption,
+                image_cache.image_data,
+                image_cache.mime_type,
+                image_cache.file_size,
+                image_cache.width,
+                image_cache.height,
+                image_cache.created_at or datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                image_cache.access_count
+            ))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_image_cache(self, url_hash: str) -> Optional[ImageCache]:
+        """이미지 캐시 조회 및 액세스 카운트 증가"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            # 캐시된 이미지 조회
+            cursor = conn.execute("""
+                SELECT * FROM image_cache WHERE url_hash = ?
+            """, (url_hash,))
+            
+            row = cursor.fetchone()
+            if row:
+                # 액세스 카운트 증가
+                conn.execute("""
+                    UPDATE image_cache 
+                    SET last_accessed = ?, access_count = access_count + 1
+                    WHERE url_hash = ?
+                """, (datetime.now().isoformat(), url_hash))
+                conn.commit()
+                
+                return ImageCache(
+                    id=row['id'],
+                    url_hash=row['url_hash'],
+                    original_url=row['original_url'],
+                    alt_text=row['alt_text'],
+                    caption=row['caption'],
+                    image_data=row['image_data'],
+                    mime_type=row['mime_type'],
+                    file_size=row['file_size'],
+                    width=row['width'],
+                    height=row['height'],
+                    created_at=row['created_at'],
+                    last_accessed=row['last_accessed'],
+                    access_count=row['access_count'] + 1
+                )
+            return None
+
+    def cleanup_old_images(self, days_old: int = 30, max_size_mb: int = 100):
+        """오래된 이미지 캐시 정리"""
+        with sqlite3.connect(self.db_path) as conn:
+            from datetime import datetime, timedelta
+            
+            cutoff_date = (datetime.now() - timedelta(days=days_old)).isoformat()
+            
+            # 오래된 이미지 삭제
+            conn.execute("""
+                DELETE FROM image_cache 
+                WHERE last_accessed < ? AND access_count < 5
+            """, (cutoff_date,))
+            
+            # 크기 제한 체크 (MB 단위)
+            max_size_bytes = max_size_mb * 1024 * 1024
+            total_size = conn.execute("""
+                SELECT SUM(file_size) as total FROM image_cache
+            """).fetchone()[0] or 0
+            
+            if total_size > max_size_bytes:
+                # 액세스가 적은 오래된 이미지부터 삭제
+                conn.execute("""
+                    DELETE FROM image_cache 
+                    WHERE id IN (
+                        SELECT id FROM image_cache 
+                        ORDER BY access_count ASC, last_accessed ASC 
+                        LIMIT (
+                            SELECT COUNT(*) / 4 FROM image_cache
+                        )
+                    )
+                """)
+            
             conn.commit()
 
     def create_user(self, username: str, password: str, email: Optional[str] = None, 

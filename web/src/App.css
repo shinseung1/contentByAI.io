@@ -761,13 +761,43 @@ body {
   color: #ffffff !important;
 }
 
+/* Generated content text selection override */
+.generated-content ::selection {
+  background: rgba(114, 46, 209, 0.3) !important;
+  color: #000000 !important;
+}
+
 /* Global Text Color Override */
 * {
   color: inherit;
 }
 
-div, span, p, label, td, th, li, a {
+/* Only apply white color to UI elements, not content areas */
+.ant-layout div:not(.generated-content *), .ant-layout span:not(.generated-content *), .ant-layout p:not(.content-text):not(.generated-content *), .ant-layout label:not(.generated-content *), .ant-layout td:not(.generated-content *), .ant-layout th:not(.generated-content *), .ant-layout li:not(.content-text):not(.generated-content *), .ant-layout a:not(.content-link):not(.generated-content *),
+.ant-card div:not(.content-wrapper *):not(.generated-content *), .ant-card span:not(.content-wrapper *):not(.generated-content *), .ant-card p:not(.content-wrapper *):not(.generated-content *), .ant-card label:not(.content-wrapper *):not(.generated-content *),
+.ant-form div:not(.generated-content *), .ant-form span:not(.generated-content *), .ant-form p:not(.generated-content *), .ant-form label:not(.generated-content *), .ant-form td:not(.generated-content *), .ant-form th:not(.generated-content *), .ant-form li:not(.generated-content *), .ant-form a:not(.generated-content *) {
   color: #ffffff !important;
+}
+
+/* Allow content areas to use their own colors */
+.content-wrapper {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-radius: 12px !important;
+  padding: 40px !important;
+  margin: 20px 0 !important;
+}
+
+.content-wrapper, .content-wrapper * {
+  color: #000000 !important;
+}
+
+.content-text, .content-text * {
+  color: #000000 !important;
+}
+
+.content-link {
+  color: #3498db !important;
 }
 
 /* Secondary Text */
@@ -883,4 +913,61 @@ div, span, p, label, td, th, li, a {
 .ant-modal-footer {
   background: #262626 !important;
   border-top: 1px solid #434343 !important;
+}
+
+/* ======================== GENERATED CONTENT OVERRIDES ======================== */
+/* These styles must be at the end to ensure they override all other styles */
+
+/* Generated Content Black Text - Maximum Priority Override */
+.generated-content,
+.generated-content *,
+.generated-content div,
+.generated-content span,
+.generated-content p,
+.generated-content h1,
+.generated-content h2,
+.generated-content h3,
+.generated-content h4,
+.generated-content h5,
+.generated-content h6,
+.generated-content li,
+.generated-content td,
+.generated-content th,
+.generated-content label {
+  color: #000000 !important;
+}
+
+/* Generated Content Emphasis Colors */
+.generated-content strong {
+  color: #e74c3c !important;
+  font-weight: 600 !important;
+}
+
+.generated-content a {
+  color: #3498db !important;
+  text-decoration: none !important;
+}
+
+.generated-content a:hover {
+  text-decoration: underline !important;
+}
+
+.generated-content em {
+  color: #000000 !important;
+  font-style: italic !important;
+}
+
+/* Generated Content Figure Captions */
+.generated-content figcaption {
+  color: #666666 !important;
+  font-style: italic !important;
+}
+
+/* Generated Content Aside Elements */
+.generated-content aside h3 {
+  color: inherit !important; /* Will use the brand color set by each page */
+}
+
+.generated-content aside {
+  color: #000000 !important;
 }

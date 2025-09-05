@@ -50,8 +50,13 @@ class OpenAIClient(BaseAIClient):
             
             return self._parse_response(response_data)
         except Exception as e:
-            print(f"OpenAI API Error: {e}")
-            print(f"Request: {formatted_request}")
+            # Use safe printing to avoid Unicode encoding errors on Windows
+            try:
+                import sys
+                print(f"OpenAI API Error: {e}", file=sys.stderr)
+                # Don't print request details with potentially problematic Unicode
+            except UnicodeEncodeError:
+                print("OpenAI API Error occurred (with Unicode characters)", file=sys.stderr)
             raise
     
     def _format_request(self, request: AIRequest) -> dict:
