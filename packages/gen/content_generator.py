@@ -431,60 +431,53 @@ class ContentGenerator:
             "caption": "첫 번째 섹션 제목에 맞는 이미지 캡션"
         },
         {
-            "url": "section_specific_image_2",
-            "alt": "두 번째 주요 섹션과 관련된 구체적인 이미지 설명", 
+            "url": "section_specific_image_2", 
+            "alt": "두 번째 주요 섹션과 관련된 구체적인 이미지 설명",
             "caption": "두 번째 섹션 제목에 맞는 이미지 캡션"
         },
         {
             "url": "section_specific_image_3",
             "alt": "세 번째 주요 섹션과 관련된 구체적인 이미지 설명",
             "caption": "세 번째 섹션 제목에 맞는 이미지 캡션"
+        },
+        {
+            "url": "section_specific_image_4",
+            "alt": "네 번째 주요 섹션과 관련된 구체적인 이미지 설명",
+            "caption": "네 번째 섹션 제목에 맞는 이미지 캡션"
+        },
+        {
+            "url": "section_specific_image_5",
+            "alt": "다섯 번째 주요 섹션과 관련된 구체적인 이미지 설명",
+            "caption": "다섯 번째 섹션 제목에 맞는 이미지 캡션"
         }
     ],"""
         else:
             image_instructions = """    "images": [],"""
         
-        return f"""당신은 전문 가이드 작성자입니다. 
-다음 **샘플 스타일을 정확히 따라서** 체계적이고 정보성 있는 완전한 가이드를 작성하세요:
+        return f"""브런치 스타일 가이드를 작성해주세요.
 
-**샘플 분석 및 적용 기준 (대한항공 스카이패스 가이드 구조)**:
+주제: 마일리지 프로그램 완전 가이드
 
-1. **제목 스타일**: "○○○ 가이드 — 전체 통합본" 형태의 완전 정복 가이드
-2. **섹션 구조**: 
-   - ## 1. ○○○란? (개념 설명, 핵심 기능, 대상)
-   - ## 2. ○○○ 등급/분류 (체계적 분류와 기준표)
-   - ## 3. 제휴/연관 시스템 (관련 서비스나 파트너)
-   - ## 4. 구체적 사용법 (단계별 가이드, 기준표)
-   - ## 5. 실제 적용/공제/활용 (실무 정보, 수치 포함)
-   - ## 6-7. 부가 서비스 (추가 혜택, 보너스 정보)
-   - ## 8. 요약 및 팁 (핵심 포인트 + 실전 조언)
+구조:
+1. 제목 — 전체 통합본
+2. 개념 소개
+3. ## 1. 기본 개념
+4. ## 2. 등급 시스템 (비교표 포함)
+5. ## 3. 제휴 서비스
+6. ## 4. 사용 방법
+7. ## 5. 활용 팁
+8. ## 6. 부가 혜택
+9. ## 7. 실전 조언
+10. ## 8. 요약
 
-3. **내용 스타일**:
-   - 각 섹션마다 구체적 기준표나 수치 정보 포함
-   - "- 항목: 설명" 형태의 명확한 구조
-   - 실무에 바로 적용 가능한 구체적 정보
-   - 표 형태로 정리된 기준이나 요금 정보
-   - 주의사항과 제한 조건 명시
-
-4. **이미지 활용**: 각 섹션마다 해당 섹션 제목과 직접 관련된 구체적인 이미지 (예: "대한항공" 섹션 → 대한항공 관련 이미지)
-
-작성 요구사항:
-- 톤: {request.tone} (샘플처럼 신뢰성 있고 정확한 정보 전달 톤)
-- 목표 단어 수: 정확히 {request.word_count}단어 (HTML 태그 제외하고 순수 텍스트 기준)
+요구사항:
+- {request.word_count}단어 분량
+- 테이블 3개 이상 포함
+- 링크 생성 금지
+- 톤: {request.tone}
 - 언어: {request.target_language}
 
 {language_instruction}
-
-### 필수 적용 사항
-
-1. **제목**: "○○○ 완전 정복 가이드" 또는 "○○○ 가이드 — 전체 통합본" 형태
-2. **구조**: 샘플과 같은 8개 내외의 번호별 섹션 구성
-3. **정보 밀도**: 각 섹션에 구체적 수치, 기준, 표, 조건 등 실무 정보 포함
-4. **표 활용**: 기준이나 요금, 등급 등은 반드시 표 형태로 정리
-5. **실용성**: 독자가 바로 활용할 수 있는 단계별 가이드
-6. **완성도**: 해당 주제에 대한 모든 필요 정보를 포함한 완전 가이드
-
-**중요: 반드시 HTML 형식과 마크다운 형식 두 버전 모두 제공해주세요.**
 
 응답 형식을 다음 JSON 구조로 제공해주세요:
 {{
@@ -496,20 +489,18 @@ class ContentGenerator:
 {image_instructions}
 }}
 
-HTML 작성 규칙 (브런치 스타일):
-- 제목: <h1 style="color: #000000; font-size: 2.4em; font-weight: 700; margin-bottom: 0.5em; line-height: 1.2;">메인 제목</h1>
-- 인트로: <div style="color: #000000; font-size: 1.1em; line-height: 1.8; margin-bottom: 2em; border-left: 3px solid #3498db; padding-left: 20px;">인트로 내용</div>
-- 부제목: <h2 style="color: #000000; font-size: 1.8em; font-weight: 600; margin-top: 2.5em; margin-bottom: 1em;">부제목</h2>
-- 소제목: <h3 style="color: #000000; font-size: 1.4em; font-weight: 500; margin-top: 2em; margin-bottom: 0.8em;">소제목</h3>
-- 본문: <p style="color: #000000; line-height: 1.8; font-size: 16px; margin-bottom: 1.5em;">본문 내용</p>
-- 강조: <strong style="color: #e74c3c; font-weight: 600;">강조 텍스트</strong>
-- 리스트: <ul style="color: #000000; margin: 1em 0; padding-left: 20px;"><li style="margin-bottom: 0.8em; line-height: 1.6;">항목</li></ul>
-- 번호 리스트: <ol style="color: #000000; margin: 1em 0; padding-left: 20px;"><li style="margin-bottom: 0.8em; line-height: 1.6;">항목</li></ol>
-- 표 형식: <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; border: 1px solid #ddd;"><thead><tr style="background: #f8f9fa;"><th style="border: 1px solid #ddd; padding: 12px; text-align: left; font-weight: 600; color: #000000;">제목</th></tr></thead><tbody><tr><td style="border: 1px solid #ddd; padding: 12px; color: #000000;">내용</td></tr></tbody></table>
-- 인용/팁: <div style="background: #f8f9fa; border-left: 4px solid #3498db; padding: 1.5em; margin: 2em 0; border-radius: 4px;"><p style="color: #000000; margin: 0; font-style: italic;">💡 유용한 팁이나 중요 정보</p></div>
-- 중요한 키워드: <span style="color: #2980b9; font-weight: 600;">키워드</span>
-- 주의사항: <span style="color: #e67e22; font-weight: 600;">주의사항</span>
-- 관련 링크: <div style="margin: 15px 0;"><a href="#" style="color: #3498db; text-decoration: none; font-weight: 600; font-size: 14px; padding: 8px 12px; border: 1px solid #3498db; border-radius: 6px; display: inline-block; background: transparent;">섹션명</a></div>
+**🎨 HTML 작성 규칙** (브런치 스타일):
+- **메인 제목**: <h1 style="color: #000000; font-size: 2.4em; font-weight: 700; margin-bottom: 0.5em; line-height: 1.2;">제목 — 전체 통합본</h1>
+- **도입부**: <div style="color: #000000; font-size: 1.1em; line-height: 1.8; margin-bottom: 2em; border-left: 3px solid #3498db; padding-left: 20px;">인트로 내용</div>
+- **섹션 제목**: <h2 style="color: #000000; font-size: 1.8em; font-weight: 600; margin-top: 2.5em; margin-bottom: 1em;">## 1. 섹션제목</h2>
+- **이미지 삽입**: <img src="이미지URL" alt="설명" style="width: 100%; max-width: 600px; height: auto; margin: 1.5em 0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+- **본문**: <p style="color: #000000; line-height: 1.8; font-size: 16px; margin-bottom: 1.5em;">상세한 본문 내용</p>
+- **강조**: <strong style="color: #e74c3c; font-weight: 600;">중요한 내용</strong>
+- **리스트**: <ul style="color: #000000; margin: 1em 0; padding-left: 20px;"><li style="margin-bottom: 0.8em; line-height: 1.6;">- 항목: 상세 설명</li></ul>
+- **테이블**: <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; border: 1px solid #ddd;"><thead><tr style="background: #f8f9fa;"><th style="border: 1px solid #ddd; padding: 12px; text-align: left; font-weight: 600; color: #000000;">항목</th><th style="border: 1px solid #ddd; padding: 12px; text-align: left; font-weight: 600; color: #000000;">기준</th><th style="border: 1px solid #ddd; padding: 12px; text-align: left; font-weight: 600; color: #000000;">혜택</th></tr></thead><tbody><tr><td style="border: 1px solid #ddd; padding: 12px; color: #000000;">내용</td></tr></tbody></table>
+- **팁 박스**: <div style="background: #f8f9fa; border-left: 4px solid #3498db; padding: 1.5em; margin: 2em 0; border-radius: 4px;"><p style="color: #000000; margin: 0; font-style: italic;">💡 실전 팁: 구체적인 조언</p></div>  
+- **구분선**: <hr style="border: none; border-top: 2px solid #e0e0e0; margin: 3em 0;">
+- **주의사항**: <span style="color: #e67e22; font-weight: 600; background: #fff3cd; padding: 2px 6px; border-radius: 4px;">⚠️ 주의사항</span>
 
 **중요: 절대 흰색(#ffffff, #fff, white) 또는 매우 밝은 색상을 사용하지 마세요.**
 
@@ -646,80 +637,30 @@ HTML 작성 규칙 (브런치 스타일):
 11. **절대 Google 검색 링크 금지**: 어떤 경우에도 google.com/search 형태의 링크를 만들지 마세요
 12. **링크 생성 전면 금지**: 섹션별 링크, 외부 링크, 참조 링크 등 모든 <a> 태그 링크 생성을 하지 마세요"""
 
-        return f"""주어진 주제에 대해 sample.md와 sample2.md 기준으로 **완전 정복 가이드**를 작성해주세요.
+        return f"""주제: {request.topic}
 
-**📋 표준 템플릿 구조** (sample.md 참고):
-1. **메인 제목**: # [주제명] 가이드 — 전체 통합본  
-2. **핵심 섹션들**: ## 1. [기본 개념], ## 2. [등급/분류], ## 3. [주요 특징], ## 4. [세부 내용], ## 5. [활용 방법]
-3. **이미지 활용**: 각 섹션별 관련 이미지 ![설명](URL) 형식으로 포함
-4. **구분선 사용**: --- 를 섹션 간 구분으로 활용  
-5. **요약 및 결론**: ## 요약 및 팁, ## 결론으로 마무리
-6. **상세 정리**: 브런치 스타일의 추가 정리 섹션 포함
+완전한 가이드를 작성해주세요.
 
-**🔗 링크 규칙** (sample2.md 기준):
-- ❌ **절대 금지**: "바로가기", "바로 가기", "Go", "Visit", "Click here" 등 모든 CTA
-- ✅ **유일 허용**: "자세히 보기" 단 하나만  
-- **사용법**: 메인 섹션 제목 옆에 아래 HTML/CSS 코드로 딱 1개만 배치:
+구조:
+# [주제] 가이드 — 전체 통합본
+> 도입부
 
-```html
-<!-- [주제명] 섹션 - 자세히 보기 버튼 -->  
-<a class="see-more" href="#section-detail" aria-label="[주제명] 자세히 보기">자세히 보기</a>
-<style>
-.see-more {{
-  display:inline-flex; align-items:center; gap:.5rem;
-  padding:.5rem 1rem; border:1px solid #d0d7de; border-radius:999px;
-  background:linear-gradient(180deg,#ffffff,#f3f4f6);
-  font-weight:600; text-decoration:none; color:#111827;
-  box-shadow:0 1px 2px rgba(0,0,0,.06);
-  transition:transform .15s ease, box-shadow .15s ease;
-}}
-.see-more::after {{ content:"›"; font-size:1rem; line-height:1; }}  
-.see-more:hover {{ transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.12); }}
-</style>
-```
+## 1. 기본 개념
+## 2. 등급 시스템 (표 포함)
+## 3. 제휴 서비스
+## 4. 사용 방법  
+## 5. 활용 팁
+## 6. 부가 혜택
+## 7. 실전 조언
+## 8. 요약
 
-**가이드 주제**: {request.topic}
+요구사항:
+- {min_words}-{max_words}단어
+- 테이블 3개 이상
+- 링크 생성 안함
+- 톤: {request.tone}
 
-**작성 지침:**
-{important_points}
-
-**샘플 기준 완전 가이드 구성 (필수):**
-1. **완전 정복 제목** - "○○○ 완전 정복 가이드 — 전체 통합본" 형태
-2. **체계적 섹션 구성** (8개 내외):
-   - ## 1. ○○○란? → 개념, 정의, 기본 정보
-   - ## 2. 분류/등급/유형 → 체계적 분류와 상세 기준
-   - ## 3. 관련 시스템/제휴 → 연관 서비스나 파트너 정보
-   - ## 4. 구체적 방법/절차 → 단계별 상세 가이드
-   - ## 5. 실제 적용/활용 → 실무 정보, 수치, 기준표
-   - ## 6-7. 부가 혜택/서비스 → 추가 정보, 보너스 활용법
-   - ## 8. 요약 및 실전 팁 → 핵심 정리 + 활용 조언
-
-3. **정보 밀도와 실용성:**
-   - 각 섹션에 구체적 수치, 기준표, 조건 포함
-   - 표 형태로 정리된 정보 (요금, 등급, 기준 등)
-   - 실무에 바로 적용 가능한 단계별 설명
-   - 주의사항, 제한 조건, 예외 상황 명시
-
-4. **전문성과 완성도:**
-   - 해당 분야의 모든 필요 정보를 포함한 완전 가이드
-   - 신뢰할 수 있는 정확한 정보와 수치
-   - 독자가 다른 자료를 찾을 필요 없는 완전성
-
-**톤 & 스타일:**
-- {request.tone} 톤 + 샘플처럼 신뢰성 있고 정확한 정보 전달
-- 전문성과 실용성의 완벽한 결합
-- 독자가 전문가 수준의 지식을 얻을 수 있는 깊이
-
-**톤별 내용 조절 필수사항:**
-{self._get_tone_specific_guidelines(request.tone)}
-
-**🚨🚨🚨 절대적 단어수 준수 필수 🚨🚨🚨**: 
-- **범위**: {min_words}-{max_words}단어 (HTML 태그 완전 제외)
-- **목표**: 정확히 {request.word_count}단어 달성
-- **계산법**: 모든 HTML 태그 제거 후 순수 텍스트만 카운트
-- **전략**: {request.word_count}단어는 매우 긴 분량이므로 각 섹션을 극도로 상세하게 작성
-- **필수**: 8-10개의 긴 섹션으로 구성하여 충분한 분량 확보
-- **부족시**: 더 많은 섹션, 상세한 예시, 실무 정보 대폭 추가"""
+{important_points}"""
     
     def _parse_ai_response(self, ai_content: str, request: GenerationRequest) -> GeneratedContent:
         """Parse AI response into GeneratedContent."""
@@ -912,57 +853,30 @@ HTML 작성 규칙 (브런치 스타일):
         return cleaned_content
     
     def _final_google_link_cleanup(self, html_content: str) -> str:
-        """Final pass to remove any remaining Google search links and meaningless links."""
+        """Final pass to remove any remaining Google search links and ALL problematic links."""
         import re
         
-        # ULTRA AGGRESSIVE GOOGLE LINK REMOVAL
-        # Step 1: Remove ALL links first, then selectively add back allowed ones
+        # ULTRA AGGRESSIVE LINK REMOVAL - Remove ALL links completely
         
-        # Extract all links to analyze them
-        link_pattern = r'<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>'
-        links = re.findall(link_pattern, html_content, re.IGNORECASE | re.DOTALL)
-        
-        # Define allowed domains/patterns
-        allowed_patterns = [
-            r'https?://.*\.gov\.kr',     # Korean government sites
-            r'https?://.*\.go\.kr',      # Korean official sites  
-            r'https?://.*\.or\.kr',      # Korean organizations
-            r'https?://.*\.ac\.kr',      # Korean academic sites
-            r'https?://news\.naver\.com', # Naver news
-            r'https?://news\.daum\.net',  # Daum news
-            r'https?://www\.chosun\.com', # Chosun Ilbo
-            r'https?://www\.donga\.com',  # Dong-A Ilbo
-            r'https?://www\.joongang\.co\.kr', # JoongAng Ilbo
-            r'https?://news\.kbs\.co\.kr', # KBS News
-            r'https?://imnews\.imbc\.com', # MBC News
-            r'https?://news\.sbs\.co\.kr', # SBS News
-            r'https?://www\.ytn\.co\.kr',  # YTN
-            r'https?://www\.yna\.co\.kr',  # Yonhap News
-            r'https?://www\.whitehouse\.gov', # White House
-            r'https?://ustr\.gov',        # US Trade Representative
-            r'https?://.*\.state\.gov',   # US State Department
-        ]
-        
-        # Prohibited patterns (ABSOLUTE BLOCK)
-        prohibited_patterns = [
-            r'.*google\.com.*',
-            r'.*search.*',
-            r'.*q=.*',
-            r'.*%EC%.*',  # URL encoded Korean
-            r'.*%ED%.*',  # URL encoded Korean  
-            r'.*%EA%.*',  # URL encoded Korean
-            r'.*query=.*',
-            r'.*searchterm=.*',
-            r'.*keyword=.*',
-            r'^#$',       # Empty hash links
-            r'^$',        # Completely empty links
-        ]
-        
-        # Step 1: Remove ALL existing links
+        # Step 1: Remove ALL <a> tags with any content
         html_content = re.sub(r'<a[^>]*>.*?</a>', '', html_content, flags=re.IGNORECASE | re.DOTALL)
-        html_content = re.sub(r'<div[^>]*>\s*</div>', '', html_content, flags=re.IGNORECASE)  # Remove empty divs
         
-        print(f"DEBUG: Removed all links, remaining content length: {len(html_content)}")
+        # Step 2: Remove any remaining href attributes
+        html_content = re.sub(r'href\s*=\s*["\'][^"\']*["\']', '', html_content, flags=re.IGNORECASE)
+        
+        # Step 3: Remove empty divs and spans left from link removal
+        html_content = re.sub(r'<div[^>]*>\s*</div>', '', html_content, flags=re.IGNORECASE)
+        html_content = re.sub(r'<span[^>]*>\s*</span>', '', html_content, flags=re.IGNORECASE)
+        
+        # Step 4: Remove any standalone URLs that might be left
+        html_content = re.sub(r'https?://[^\s<>"]*google[^\s<>"]*', '', html_content, flags=re.IGNORECASE)
+        html_content = re.sub(r'https?://[^\s<>"]*search[^\s<>"]*', '', html_content, flags=re.IGNORECASE)
+        
+        # Step 5: Clean up multiple spaces and line breaks left from removals
+        html_content = re.sub(r'\s+', ' ', html_content)
+        html_content = re.sub(r'>\s+<', '><', html_content)
+        
+        print(f"DEBUG: Removed ALL links completely, remaining content length: {len(html_content)}")
         
         return html_content
     

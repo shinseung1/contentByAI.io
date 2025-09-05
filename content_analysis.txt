@@ -1,0 +1,22 @@
+=== GENERATED CONTENT ANALYSIS ===
+Title: 대한항공 스카이패스 마일리지 적립과 사용방법 — 전체 통합본
+Summary exists: True
+Tags count: 3
+Images count: 5
+Content length: 4560 characters
+
+=== STRUCTURE ANALYSIS ===
+H1 headings: 1
+H2 headings: 8
+H3 headings: 0
+Tables: 1
+
+=== H2 HEADINGS ===
+1. 1. 대한항공 스카이패스란?
+2. 2. 스카이패스 등급 및 분류
+3. 3. 제휴 및 연관 시스템
+4. 4. 마일리지 적립 방법
+5. 5. 마일리지 사용법
+6. 6. 부가 서비스 및 혜택
+7. 7. 주의사항 및 제한 조건
+8. 8. 요약 및 팁

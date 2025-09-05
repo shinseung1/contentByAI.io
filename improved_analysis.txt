@@ -1,0 +1,13 @@
+=== IMPROVED TEMPLATE ANALYSIS ===
+Title: Content about 대한항공 스카이패스 마일리지 적립과 사용방법
+Content length: 104 characters
+Word count (approx): 18 words
+Images count (JSON): 5
+
+=== STRUCTURE ANALYSIS ===
+H1 headings: 0
+H2 headings: 0
+Tables: 0
+Images in HTML: 0
+Horizontal rules: 0
+Em dash in title: False
