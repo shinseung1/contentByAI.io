@@ -18,6 +18,7 @@ import uuid
 import secrets
 from datetime import datetime, timedelta
 from database import db, TestResult, GenerationJob, User, LoginSession
+from packages.gen.content_generator import ContentGenerator
 
 # .env 파일 로드
 load_dotenv()
@@ -69,6 +70,9 @@ class JobStatusResponse(BaseModel):
     result: Optional[Dict[str, Any]] = None
     errorMessage: Optional[str] = None
     errorCode: Optional[str] = None
+    tone: Optional[str] = None
+    word_count: Optional[int] = None
+    created_at: Optional[str] = None
 
 class ProviderStatsResponse(BaseModel):
     totalTests: int
@@ -272,8 +276,8 @@ async def validate_and_enhance_content(html_content: str, target_word_count: int
     current_length = get_text_length_from_html(html_content)
     print(f"📊 현재 글자수: {current_length}자, 목표: {target_word_count}자 ({current_length/target_word_count*100:.1f}%)")
     
-    # 목표 글자수의 75% 이하인 경우 추가 내용 생성 필요
-    if current_length < target_word_count * 0.75:
+    # 목표 글자수의 60% 이하인 경우 추가 내용 생성 필요 (더 엄격한 기준)
+    if current_length < target_word_count * 0.6:
         shortage = target_word_count - current_length
         print(f"⚠️ 글자수 부족: {shortage}자 추가 필요")
         
@@ -429,19 +433,19 @@ def convert_text_to_html(content: str, job, image_urls: list) -> str:
     <meta name="description" content="{content[:150]}...">
     <meta name="author" content="Noaats AI">
     <style>
-        body {{ margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; line-height: 1.6; color: #333; }}
-        article {{ max-width: 800px; margin: 0 auto; }}
-        h1 {{ font-size: 2.2em; font-weight: 700; color: #1a1a1a; margin-bottom: 0.5em; }}
-        h2 {{ font-size: 1.6em; font-weight: 600; color: #2c3e50; margin: 1.5em 0 0.8em; }}
-        h3 {{ font-size: 1.3em; font-weight: 500; color: #34495e; margin: 1.2em 0 0.6em; }}
-        p {{ margin-bottom: 1.2em; line-height: 1.7; font-size: 15px; color: #333; }}
-        ul, ol {{ margin-bottom: 1.2em; padding-left: 1.5em; }}
-        li {{ margin-bottom: 0.5em; }}
-        figure {{ margin: 2em 0; text-align: center; }}
-        img {{ max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }}
-        figcaption {{ margin-top: 0.8em; font-style: italic; color: #666; font-size: 14px; }}
-        strong {{ font-weight: 600; }}
-        em {{ font-style: italic; }}
+        body {{ margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; line-height: 1.6; color: #2c3e50; background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); }}
+        article {{ max-width: 900px; margin: 0 auto; padding: 40px; background: white; border-radius: 20px; box-shadow: 0 12px 48px rgba(0,0,0,0.12); }}
+        h1 {{ color: #2c3e50; font-size: 2.8em; font-weight: 800; margin-bottom: 0.8em; line-height: 1.2; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        h2 {{ color: #2c3e50; font-size: 2.1em; font-weight: 700; margin-top: 3.5em; margin-bottom: 1.5em; background: linear-gradient(135deg, #74b9ff 0%, #0984e3 50%, #6c5ce7 100%); padding: 20px 30px; border-radius: 15px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); text-align: center; color: white; }}
+        h3 {{ color: #2c3e50; font-size: 1.5em; font-weight: 600; margin: 2em 0 1em; padding: 10px 0; border-bottom: 2px solid #74b9ff; }}
+        p {{ color: #2c3e50; line-height: 1.9; font-size: 17px; margin-bottom: 2em; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 25px; border-radius: 12px; border-left: 6px solid #74b9ff; box-shadow: 0 4px 16px rgba(0,0,0,0.08); font-weight: 400; }}
+        ul, ol {{ color: #2c3e50; margin: 2em 0; padding: 25px; background: linear-gradient(135deg, #ddd6fe 0%, #c084fc 20%, #e879f9 100%); border-radius: 15px; box-shadow: 0 6px 24px rgba(0,0,0,0.12); list-style: none; }}
+        li {{ color: #2c3e50; margin-bottom: 1em; line-height: 1.7; background: white; padding: 15px 20px; border-radius: 10px; margin: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #74b9ff; font-weight: 500; }}
+        figure {{ margin: 2em auto; text-align: center; max-width: 700px; }}
+        img {{ max-width: 100%; height: auto; border-radius: 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.2); border: 4px solid white; filter: brightness(1.05) contrast(1.1); }}
+        figcaption {{ margin-top: 0.8em; font-style: italic; color: #666; font-size: 14px; font-weight: 500; }}
+        strong {{ color: white; font-weight: 700; background: linear-gradient(135deg, #e17055 0%, #d63031 50%, #e84393 100%); padding: 4px 10px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }}
+        em {{ font-style: italic; color: #74b9ff; font-weight: 500; }}
     </style>
 </head>
 <body>
@@ -904,15 +908,34 @@ async def get_job_status(job_id: str, current_user: User = Depends(get_current_u
         response = JobStatusResponse(
             jobId=job.job_id,
             status=job.status,
-            progress=job.progress
+            progress=job.progress,
+            tone=job.tone,
+            word_count=job.word_count,
+            created_at=job.created_at
         )
         
         if job.status == "completed" and job.content:
+            # Try to get word_count_actual from content object
+            actual_word_count = 0
+            try:
+                import json
+                content_obj = json.loads(job.content)
+                actual_word_count = content_obj.get('word_count_actual', 0)
+                if not actual_word_count:
+                    # Fallback: calculate from HTML content
+                    html_content = content_obj.get('html_content', '')
+                    if html_content:
+                        import re
+                        plain_text = re.sub(r'<[^>]+>', '', html_content)
+                        actual_word_count = len(plain_text.split())
+            except:
+                actual_word_count = len(job.content.split()) if job.content else 0
+            
             response.result = {
                 "bundleId": f"bundle_{job.job_id}",
                 "title": job.topic,
                 "contentPreview": job.content[:200] + "..." if len(job.content) > 200 else job.content,
-                "wordCount": len(job.content.split()) if job.content else 0,
+                "wordCount": actual_word_count,
                 "imagesCount": 0,
                 "seoScore": 85
             }
@@ -1291,18 +1314,18 @@ CRITICAL RULES (반드시 준수):
 STRUCTURE RULES:
 1. <h1>제목</h1> - 단 1개만 사용 (주제: "{job.topic}")
 2. 목차:
-   <div class="table-of-contents" style="background: #f8f9fa; padding: 1.5em; border-radius: 8px; margin: 2em 0; border: 1px solid #e9ecef;">
-     <h3 style="color: #2c3e50 !important; margin-bottom: 1em; font-weight: 600;">목차</h3>
-     <ul style="color: #333 !important; list-style: none; padding-left: 0; margin: 0;">
-       <li style="margin-bottom: 0.8em; color: #333 !important;"><a href="#section-1" style="color: #495057 !important; text-decoration: none; font-weight: 500; display: block; padding: 0.3em 0;">• 섹션 제목 1</a></li>
-       <li style="margin-bottom: 0.8em; color: #333 !important;"><a href="#section-2" style="color: #495057 !important; text-decoration: none; font-weight: 500; display: block; padding: 0.3em 0;">• 섹션 제목 2</a></li>
+   <div class="table-of-contents" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 50%, #ffeaa7 100%); padding: 30px; border-radius: 20px; margin: 3em 0; box-shadow: 0 8px 32px rgba(0,0,0,0.12); border: 1px solid rgba(255,255,255,0.2);">
+     <h3 style="color: #2c3e50; margin-bottom: 1.5em; font-weight: 700; font-size: 1.4em; text-align: center;">📋 목차</h3>
+     <ul style="color: #2c3e50; list-style: none; padding-left: 0; margin: 0;">
+       <li style="margin-bottom: 1em; background: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);"><a href="#section-1" style="color: #2c3e50; text-decoration: none; font-weight: 500; display: block;">🔹 섹션 제목 1</a></li>
+       <li style="margin-bottom: 1em; background: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);"><a href="#section-2" style="color: #2c3e50; text-decoration: none; font-weight: 500; display: block;">🔹 섹션 제목 2</a></li>
      </ul>
    </div>
 
-3. 본문 구성 (4-6개 h2 섹션):
-   - <h2 id="section-1" style="color: #2c3e50;">섹션 제목</h2>
-   - 각 섹션당 {job.word_count // 5}자 분량의 상세한 내용 (p 태그 사용)
-   - 필요시 <h3> 소제목 사용
+3. 본문 구성 (4-6개 프리미엄 h2 섹션):
+   - <h2 id="section-1" style="color: #2c3e50; font-size: 2.1em; font-weight: 700; margin-top: 3.5em; margin-bottom: 1.5em; background: linear-gradient(135deg, #74b9ff 0%, #0984e3 50%, #6c5ce7 100%); padding: 20px 30px; border-radius: 15px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); text-align: center; color: white;">🎯 섹션 제목</h2>
+   - 각 섹션당 {job.word_count // 5}자 분량의 상세한 내용 (프리미엄 p 태그 사용)
+   - 필요시 세련된 <h3> 소제목 사용
 
 4. 이미지 삽입 (설정: "{include_images}"):
    {f'''⚠️ 중요: 반드시 실제 이미지를 표시해야 함! 텍스트로만 표시 금지!
@@ -1330,10 +1353,10 @@ STRUCTURE RULES:
    사용 가능한 실제 이미지 URL들:
    {chr(10).join([f"  - {url}" for url in image_urls])}''' if include_images == "yes" else "이미지 사용 안함"}
 
-5. 각 h2 섹션 끝에 CTA:
-   <div style="text-align: center; margin: 2em 0; padding: 1.5em; background: #f8f9fa; border-radius: 8px;">
-     <p style="margin-bottom: 1em; color: #333;">더 자세한 정보를 원하시나요?</p>
-     <a href="[아래 링크 중 선택]" target="_blank" rel="noopener" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">[링크 텍스트]</a>
+5. 각 h2 섹션 끝에 프리미엄 CTA:
+   <div style="text-align: center; margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.12);">
+     <p style="margin-bottom: 15px; color: #2c3e50; font-weight: 700; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">📰 더 자세한 정보를 원하시나요?</p>
+     <a href="[아래 링크 중 선택]" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); color: white; text-decoration: none; font-weight: 700; font-size: 15px; padding: 15px 30px; border-radius: 50px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); transform: translateY(0); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-transform: uppercase; letter-spacing: 1px; position: relative; overflow: hidden;">[링크 텍스트]</a>
    </div>
 
 AVAILABLE LINKS:
@@ -1368,25 +1391,59 @@ OUTPUT: 순수 HTML만 출력 (설명, 코드펜스 없음)"""
         
         db.update_generation_job_status(job_id, "in_progress", 50)
         
-        if job.provider == "gemini":
-            result = await test_gemini_api(prompt)
-        elif job.provider == "claude":
-            result = await test_claude_api(prompt)
-        elif job.provider == "openai":
-            result = await test_openai_api(prompt)
-        elif job.provider == "grok":
-            result = await test_grok_api(prompt)
+        # Use ContentGenerator with premium styling system
+        print(f"🎯 Using ContentGenerator for topic: {job.topic}, provider: {job.provider}")
+        
+        # Create proper GenerationRequest object
+        from database import GenerationJob
+        from packages.gen.models import GenerationRequest as GenRequest
+        
+        generation_request = GenRequest(
+            topic=job.topic,
+            provider=job.provider.lower(),
+            tone=job.tone,
+            word_count=job.word_count,
+            include_images=job.include_images,
+            target_language=job.target_language
+        )
+        
+        generator = ContentGenerator()
+        await generator.generate_content_async(job_id, generation_request)
+        
+        # Get the result from database after ContentGenerator completes
+        updated_job = db.get_generation_job(job_id)
+        print(f"🔍 After ContentGenerator:")
+        print(f"  - Job status: {updated_job.status if updated_job else 'Job not found'}")
+        print(f"  - Has html_content: {bool(updated_job.html_content) if updated_job else 'N/A'}")
+        print(f"  - Has content: {bool(updated_job.content) if updated_job else 'N/A'}")
+        print(f"  - Error message: {updated_job.error_message if updated_job else 'N/A'}")
+        
+        if updated_job and updated_job.html_content:
+            html_content = updated_job.html_content
+            print(f"✅ ContentGenerator succeeded - got HTML content ({len(html_content)} chars)")
+            print(f"✅ HTML starts with: {html_content[:100] if html_content else 'Empty'}")
+        elif updated_job and updated_job.content:
+            # Try to use content field instead
+            html_content = updated_job.content
+            print(f"✅ ContentGenerator provided content field ({len(html_content)} chars)")
+            print(f"✅ Content starts with: {html_content[:100] if html_content else 'Empty'}")
         else:
-            raise Exception(f"지원하지 않는 제공자: {job.provider}")
+            print(f"❌ ContentGenerator failed - no content generated")
+            html_content = "Fallback content generation needed"
         
         db.update_generation_job_status(job_id, "in_progress", 90)
         
-        # AI가 이미 HTML을 생성했으므로 직접 사용
-        html_content = result["content"]
+        # ContentGenerator already completed and saved to database
+        # html_content is already set above, so we can skip the old processing
         
-        # HTML이 아닌 경우에만 변환 (백업용)
-        if not html_content.strip().startswith('<') or not html_content.strip().endswith('>'):
-            html_content = convert_text_to_html(result["content"], job, image_urls)
+        print(f"✅ HTML content preview (first 200 chars): {html_content[:200] if html_content else 'No content'}")
+        
+        # Only fallback to old system if ContentGenerator completely failed
+        if not html_content or html_content == "Fallback content generation needed":
+            print("🔄 ContentGenerator failed completely - Job will be marked as failed")
+            # Mark job as failed instead of using fallback
+            db.update_generation_job_status(job_id, "failed", 0, "ContentGenerator failed to generate content")
+            return
         
         # 중복 제목 제거 (더 강화된 버전)
         import re
@@ -1476,8 +1533,8 @@ OUTPUT: 순수 HTML만 출력 (설명, 코드펜스 없음)"""
             except Exception as e:
                 print(f"⚠️ 추가 콘텐츠 생성 실패: {e}")
         
-        # 생성된 HTML에 추가 스타일 보정 적용
-        html_content = apply_style_fixes(html_content)
+        # 생성된 HTML에 추가 스타일 보정 적용 (비활성화 - 프리미엄 스타일 유지)
+        # html_content = apply_style_fixes(html_content)
         
         # 최종 글자수 확인
         final_length = get_text_length_from_html(html_content)

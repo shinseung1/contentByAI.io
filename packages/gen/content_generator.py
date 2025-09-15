@@ -4,9 +4,39 @@ import asyncio
 import uuid
 import json
 import os
+import re
 from datetime import datetime
 from typing import Dict, Optional, List
 from pathlib import Path
+
+
+def safe_print(text):
+    """Safe text for printing that replaces problematic Unicode with ? for debugging."""
+    if not isinstance(text, str):
+        return text
+    emoji_pattern = re.compile("["
+                              u"\U0001F600-\U0001F64F"  # emoticons
+                              u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+                              u"\U0001F680-\U0001F6FF"  # transport & map symbols
+                              u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                              u"\U00002600-\U000027B0"  # includes airplane ✈ symbol
+                              u"\U000024C2-\U0001F251"
+                              "]+", flags=re.UNICODE)
+    return emoji_pattern.sub('?', text)
+
+def remove_emojis(text):
+    """Remove emoji characters from text to avoid encoding issues on Windows cp949."""
+    if not isinstance(text, str):
+        return text
+    emoji_pattern = re.compile("["
+                              u"\U0001F600-\U0001F64F"  # emoticons
+                              u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+                              u"\U0001F680-\U0001F6FF"  # transport & map symbols
+                              u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                              u"\U00002600-\U000027B0"  # includes airplane ✈ symbol
+                              u"\U000024C2-\U0001F251"
+                              "]+", flags=re.UNICODE)
+    return emoji_pattern.sub('', text)
 
 from packages.ai_clients import (
     AIClientFactory,
@@ -80,7 +110,8 @@ class ContentGenerator:
                         markdown_content=content_data.get("markdown_content"),
                         summary=content_data.get("summary"),
                         tags=content_data.get("tags", []),
-                        images=processed_images
+                        images=processed_images,
+                        word_count_actual=content_data.get("word_count_actual")
                     )
                 else:
                     content = GeneratedContent(
@@ -99,7 +130,16 @@ class ContentGenerator:
                     images=[]
                 )
         
-        return GenerationResponse(
+        try:
+            print(f"DEBUG: db_job.tone = {self.safe_print_str(str(db_job.tone))}")
+        except UnicodeEncodeError:
+            print("DEBUG: db_job.tone contains Unicode characters")
+        try:
+            print(f"DEBUG: db_job.word_count = {db_job.word_count}")
+        except UnicodeEncodeError:
+            print("DEBUG: db_job.word_count contains Unicode characters")
+        
+        response = GenerationResponse(
             job_id=db_job.job_id,
             status=GenerationStatus(db_job.status),
             message=db_job.topic,  # Use topic as message for display
@@ -107,8 +147,21 @@ class ContentGenerator:
             content=content,
             error=db_job.error_message,
             created_at=db_job.created_at,
-            completed_at=db_job.updated_at if db_job.status in ['completed', 'failed'] else None
+            completed_at=db_job.updated_at if db_job.status in ['completed', 'failed'] else None,
+            tone=db_job.tone,
+            word_count=db_job.word_count
         )
+        
+        try:
+            print(f"DEBUG: response.tone = {self.safe_print_str(str(response.tone))}")
+        except UnicodeEncodeError:
+            print("DEBUG: response.tone contains Unicode characters")
+        try:
+            print(f"DEBUG: response.word_count = {response.word_count}")
+        except UnicodeEncodeError:
+            print("DEBUG: response.word_count contains Unicode characters")
+        
+        return response
     
     def list_jobs(self) -> List[str]:
         """List all job IDs from database."""
@@ -182,11 +235,12 @@ class ContentGenerator:
                             "caption": img.caption
                         })
             
+            
             content_json = {
-                "title": content.title,
-                "html_content": content.content,
-                "summary": content.summary,
-                "tags": content.tags,
+                "title": remove_emojis(content.title),
+                "html_content": remove_emojis(content.content),
+                "summary": remove_emojis(content.summary) if content.summary else None,
+                "tags": [remove_emojis(tag) for tag in content.tags] if content.tags else [],
                 "images": processed_images
             }
             
@@ -210,7 +264,7 @@ class ContentGenerator:
                 
                 # Use a safer JSON serialization approach
                 def safe_json_serialize(obj):
-                    """Safely serialize objects to JSON, converting problematic types."""
+                    """Safely serialize objects to JSON, converting problematic types and handling Unicode."""
                     if hasattr(obj, '__dict__'):
                         # If it's a custom object, convert to dict
                         if hasattr(obj, 'url') and hasattr(obj, 'alt'):  # ImageInfo-like
@@ -220,6 +274,26 @@ class ContentGenerator:
                         return [safe_json_serialize(item) for item in obj]
                     elif isinstance(obj, dict):
                         return {k: safe_json_serialize(v) for k, v in obj.items()}
+                    elif isinstance(obj, str):
+                        # Handle Unicode characters by encoding/decoding safely for Windows cp949
+                        try:
+                            # Try to encode as cp949, if it fails, replace problematic characters
+                            obj.encode('cp949')
+                            return obj
+                        except UnicodeEncodeError:
+                            # Replace problematic Unicode characters (like emojis) with placeholder
+                            import re
+                            # Remove or replace emoji characters
+                            emoji_pattern = re.compile("["
+                                                      u"\U0001F600-\U0001F64F"  # emoticons
+                                                      u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+                                                      u"\U0001F680-\U0001F6FF"  # transport & map symbols
+                                                      u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                                                      u"\U00002702-\U000027B0"
+                                                      u"\U000024C2-\U0001F251"
+                                                      "]+", flags=re.UNICODE)
+                            cleaned_text = emoji_pattern.sub('', obj)  # Remove emojis
+                            return cleaned_text
                     else:
                         return obj
                 
@@ -232,13 +306,13 @@ class ContentGenerator:
                     print(f"DEBUG: Even safe JSON failed: {json_error}")
                     # Ultimate fallback: just save the HTML content
                     job.content = json.dumps({
-                        "title": str(content.title),
-                        "html_content": str(content.content),
-                        "summary": str(content.summary) if content.summary else "",
-                        "tags": list(content.tags) if content.tags else [],
+                        "title": remove_emojis(str(content.title)),
+                        "html_content": remove_emojis(str(content.content)),
+                        "summary": remove_emojis(str(content.summary)) if content.summary else "",
+                        "tags": [remove_emojis(str(tag)) for tag in content.tags] if content.tags else [],
                         "images": []  # Skip images entirely if serialization fails
                     }, ensure_ascii=False)
-                job.html_content = content.content
+                job.html_content = remove_emojis(content.content)
                 job.markdown_content = None  # Do not save markdown content
                 job.updated_at = datetime.now().isoformat()
                 self.db.save_generation_job(job)
@@ -395,6 +469,13 @@ class ContentGenerator:
             response = await client.generate(ai_request)
         
         # Parse response into structured content
+        print(f"DEBUG: Raw AI response length: {len(response.content)}")
+        try:
+            # Use safe printing to avoid Unicode encoding errors
+            safe_preview = safe_print(response.content[:500])
+            print(f"DEBUG: Raw AI response first 500 chars: {safe_preview}")
+        except (UnicodeEncodeError, AttributeError):
+            print("DEBUG: Raw AI response contains Unicode characters (preview skipped)")
         content = self._parse_ai_response(response.content, request)
         
         # Post-process HTML to remove white text, fix newlines, process inline links, and remove prohibited links
@@ -403,16 +484,55 @@ class ContentGenerator:
             content.content = self._fix_newline_display(content.content)
             content.content = self._process_inline_links(content.content)
             content.content = self._remove_prohibited_links_from_content(content.content)
+            # Replace placeholder image URLs with actual image URLs
+            if request.include_images and content.images:
+                content.images = await self._replace_placeholder_images(content.images, request.topic)
+                content.content = self._insert_images_into_content(content.content, content.images)
             # Try news-specific links first for current affairs topics
             content.content = await self._add_news_specific_links(content.content, request.topic, provider, config)
             # Then add place-specific links if not a news topic
             content.content = await self._add_specific_place_links(content.content, request.topic, provider, config)
+            # Add specific website links (booking sites, official sites, etc.)
+            content.content = self._add_specific_site_links(content.content, request.topic)
+            # Move links from titles to paragraph endings
+            content.content = self._move_title_links_to_paragraphs(content.content)
             # Final pass to remove any remaining Google/search links
             content.content = self._final_google_link_cleanup(content.content)
             # Skip AI-generated section links, use only inline links within content
             # content.content = await self._add_ai_generated_links(content.content, request.topic, provider, config)
         
         return content
+    
+    def _load_template_structure(self) -> str:
+        """Load key template structure from reference_doc/templete.md"""
+        import os
+        try:
+            # Get the project root directory
+            current_dir = os.path.dirname(__file__)
+            project_root = os.path.dirname(os.path.dirname(current_dir))
+            template_path = os.path.join(project_root, 'reference_doc', 'templete.md')
+            
+            with open(template_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Extract key structure patterns from template
+            key_patterns = [
+                "한 줄 요약:",
+                "어디로 갈까?",
+                "선택 1) 비행기 + 렌터카(가장 빠름)",
+                "선택 2) 자가용(로드트립 감성", 
+                "선택 3) 기차·버스(느리지만",
+                "한눈에 비교 표",
+                "케이스별 추천",
+                "자주 묻는 질문(FAQ)",
+                "요약 박스"
+            ]
+            
+            return "\n".join([f"- {pattern}" for pattern in key_patterns])
+            
+        except Exception as e:
+            print(f"Warning: Could not load template structure: {e}")
+            return ""
     
     def _create_system_prompt(self, request: GenerationRequest) -> str:
         """Create system prompt for AI."""
@@ -422,85 +542,286 @@ class ContentGenerator:
         elif request.target_language == "en":
             language_instruction = "Please respond in English."
         
+        # Load template structure
+        template_structure = self._load_template_structure()
+        
+        # Detect comparison topics
+        is_comparison_topic = any(keyword in request.topic.lower() for keyword in ['vs', 'versus', '대', '비교', '차이'])
+        
+        # Detect TOP/ranking topics and extract number
+        import re
+        topic_lower = request.topic.lower()
+        ranking_number = None
+        is_ranking_topic = False
+        
+        # Check for TOP patterns
+        top_patterns = [
+            r'top\s*(\d+)', r'톱\s*(\d+)', r'베스트\s*(\d+)', r'best\s*(\d+)', 
+            r'추천\s*(\d+)', r'(\d+)가지', r'(\d+)개', r'(\d+)종류', 
+            r'(\d+)위', r'(\d+)순위'
+        ]
+        
+        for pattern in top_patterns:
+            match = re.search(pattern, topic_lower)
+            if match:
+                ranking_number = int(match.group(1))
+                is_ranking_topic = True
+                break
+        
+        # Also check for written numbers in Korean
+        korean_numbers = {
+            '세': 3, '삼': 3, '네': 4, '사': 4, '다섯': 5, '오': 5,
+            '여섯': 6, '육': 6, '일곱': 7, '칠': 7, '여덟': 8, '팔': 8,
+            '아홉': 9, '구': 9, '열': 10
+        }
+        
+        for korean_num, num_val in korean_numbers.items():
+            if korean_num in topic_lower and ('가지' in topic_lower or '개' in topic_lower):
+                ranking_number = num_val
+                is_ranking_topic = True
+                break
+        
+        comparison_instruction = ""
+        top3_instruction = ""
+        
+        # Detect choice/selection topics as well
+        choice_patterns = [
+            r'(\d+)\s*가지', r'(\d+)\s*개', r'(\d+)\s*종류', r'(\d+)\s*유형', 
+            r'(\d+)\s*방법', r'(\d+)\s*선택', r'(\d+)\s*옵션'
+        ]
+        
+        choice_number = None
+        is_choice_topic = False
+        
+        for pattern in choice_patterns:
+            match = re.search(pattern, topic_lower)
+            if match:
+                choice_number = int(match.group(1))
+                is_choice_topic = True
+                break
+        
+        # Use either ranking_number or choice_number
+        final_number = ranking_number if is_ranking_topic else choice_number
+        is_multi_item_topic = is_ranking_topic or is_choice_topic
+
+        # TOP/Ranking/Choice topic instructions
+        if is_multi_item_topic and final_number:
+            # Generate emoji list for rankings
+            ranking_emojis = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+            section_examples = []
+            
+            for i in range(final_number):
+                rank_num = i + 1
+                emoji = ranking_emojis[i] if i < len(ranking_emojis) else f"{rank_num}️⃣"
+                if is_ranking_topic:
+                    section_examples.append(f"  * ## {emoji} {rank_num}위 (또는 TOP{rank_num}): [항목명] - 매우 상세한 설명 (4-5문단)")
+                else:
+                    section_examples.append(f"  * ## {emoji} 선택 {rank_num}: [항목명] - 매우 상세한 설명 (4-5문단)")
+            
+            section_structure = '\n'.join(section_examples)
+            
+            topic_type = "TOP" if is_ranking_topic else "선택"
+            
+            top3_instruction = f"""
+**🏆 {topic_type}{final_number}/다중항목 주제 특별 요구사항 (절대 필수):**
+주제 "{request.topic}"는 {final_number}개 항목을 다루는 주제입니다. 반드시 다음을 지켜주세요:
+
+**📊 구조 요구사항 (매우 중요):**
+- **정확히 {final_number}개의 항목**을 다뤄야 합니다 (명시된 숫자와 정확히 일치)
+- **각 항목별로 독립된 큰 섹션** 구성: 
+{section_structure}
+- **각 항목마다 최소 400-600단어** 할당하여 매우 상세하게 작성
+- **전체 {final_number}개 항목이 균등한 분량**으로 작성 (어느 하나도 빠뜨리거나 짧게 쓰지 말 것)
+- **모든 항목에 동일한 구조** 적용: 개요 → 특징 → 장단점 → 사용법/방법 → 추천상황
+
+**📋 필수 테이블 (반드시 포함):**
+- **종합 비교표**: {final_number}개 항목의 특징, 장단점, 점수를 한눈에 비교
+- **선택 가이드표**: 상황별/목적별로 어떤 항목을 선택해야 하는지 상세 가이드  
+- **케이스별 추천표**: 다양한 상황에서의 추천 항목과 이유
+- **항목별 상세 정보표**: 각 항목의 핵심 정보를 정리한 표
+
+**🚨 테이블 완성도 필수 사항 🚨:**
+- 모든 테이블은 반드시 완전한 HTML 구조로 생성 (opening과 closing 태그 모두 필수)
+- 각 테이블은 최소 3-5개의 완전한 행(row)을 포함해야 함
+- 테이블이 중간에 잘리거나 불완전하게 끝나면 안됨
+- `<table>` 태그로 시작했으면 반드시 `</table>` 태그로 완료
+- 모든 `<tr>` 태그는 반드시 `</tr>`로 완료
+- 모든 `<td>`와 `<th>` 태그는 반드시 완전히 닫혀야 함
+
+**✅ 각 항목별 필수 내용:**
+- **선정 이유** (왜 이 항목인지)
+- **핵심 특징 및 장점** (구체적 예시 포함)
+- **단점 및 한계사항** (솔직한 평가)
+- **구체적 사용 사례/활용법** (실제 예시)
+- **추천 대상 및 상황** (언제, 누구에게)
+- **실제 후기/평가 정보** (가능한 경우)
+
+**⚠️ 절대 준수 사항:**
+- {final_number}개 항목 **모두 반드시 포함** (하나도 빠뜨리면 안됨)
+- 모든 항목이 **동일한 깊이와 상세함**으로 작성 (균등 분배)
+- 각 섹션은 **큰 덩어리로 구성** (작은 카드들로 쪼개지 말고 항목1 전체, 항목2 전체, 항목3 전체로)
+- **케이스별 추천 섹션** 반드시 포함 (어떤 상황에서 어떤 선택을 해야 하는지)
+
+"""
+        
+        if is_comparison_topic:
+            comparison_instruction = f"""
+**🔥 비교 주제 특별 요구사항 (절대 필수):**
+주제 "{request.topic}"는 비교 주제입니다.
+- 반드시 양쪽 모두 동등하게 다뤄야 합니다 (예: 동부힙합 + 서부힙합 모두)
+- 각 측면별로 최소 3-4개 섹션씩 할당
+- 직접 비교하는 상세 비교표 최소 3개 필수 (매우 중요!)
+- 장단점, 특징, 차이점을 명확히 대비
+- 어느 한쪽에 편향되지 않고 균형잡힌 시각으로 작성
+- 결론에서 상황별 선택 가이드 제공
+
+**비교표 필수 항목 (반드시 HTML <table> 태그 사용):**
+1. 기본 특징 비교표 - <table><thead><tr><th>구분</th><th>A측면</th><th>B측면</th></tr></thead><tbody>...
+2. 장단점 비교표 - <table><thead><tr><th>항목</th><th>A측면 장점</th><th>A측면 단점</th><th>B측면 장점</th><th>B측면 단점</th></tr></thead>...
+3. 추천 상황별 비교표 - <table><thead><tr><th>상황</th><th>A측면 추천도</th><th>B측면 추천도</th><th>이유</th></tr></thead>...
+
+**테이블 스타일링 필수 (더 아름다운 디자인):**
+모든 <table>에 style="border-collapse: collapse; width: 100%; margin: 25px 0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" 적용
+<thead> <tr>에 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;" 적용
+모든 <th>에 style="padding: 15px 20px; text-align: left; font-weight: 600; border: none;" 적용
+모든 <td>에 style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;" 적용
+<tbody> <tr>에 style="transition: background-color 0.3s ease;" 적용
+<tbody> <tr>:nth-child(even)에 style="background-color: #f8f9ff;" 적용
+"""
+        
         image_instructions = ""
         if request.include_images:
-            image_instructions = """    "images": [
-        {
-            "url": "section_specific_image_1",
-            "alt": "첫 번째 주요 섹션과 관련된 구체적인 이미지 설명",
-            "caption": "첫 번째 섹션 제목에 맞는 이미지 캡션"
-        },
-        {
-            "url": "section_specific_image_2", 
-            "alt": "두 번째 주요 섹션과 관련된 구체적인 이미지 설명",
-            "caption": "두 번째 섹션 제목에 맞는 이미지 캡션"
-        },
-        {
-            "url": "section_specific_image_3",
-            "alt": "세 번째 주요 섹션과 관련된 구체적인 이미지 설명",
-            "caption": "세 번째 섹션 제목에 맞는 이미지 캡션"
-        },
-        {
-            "url": "section_specific_image_4",
-            "alt": "네 번째 주요 섹션과 관련된 구체적인 이미지 설명",
-            "caption": "네 번째 섹션 제목에 맞는 이미지 캡션"
-        },
-        {
-            "url": "section_specific_image_5",
-            "alt": "다섯 번째 주요 섹션과 관련된 구체적인 이미지 설명",
-            "caption": "다섯 번째 섹션 제목에 맞는 이미지 캡션"
-        }
+            # Generate image instructions based on the number of items
+            image_count = final_number if is_multi_item_topic and final_number else 5
+            image_list = []
+            
+            for i in range(image_count):
+                image_num = i + 1
+                if is_multi_item_topic:
+                    image_list.append(f"""        {{
+            "url": "item_{image_num}_image",
+            "alt": "{image_num}번째 선택/항목과 관련된 구체적인 이미지 설명",
+            "caption": "{image_num}번째 항목 관련 이미지"
+        }}""")
+                else:
+                    image_list.append(f"""        {{
+            "url": "section_specific_image_{image_num}",
+            "alt": "{image_num}번째 주요 섹션과 관련된 구체적인 이미지 설명",
+            "caption": "{image_num}번째 섹션 제목에 맞는 이미지 캡션"
+        }}""")
+            
+            images_json = ',\n'.join(image_list)
+            image_instructions = f"""    "images": [
+{images_json}
     ],"""
         else:
             image_instructions = """    "images": [],"""
         
-        return f"""브런치 스타일 가이드를 작성해주세요.
+        template_instruction = ""
+        if template_structure:
+            template_instruction = f"""
+**템플릿 구조 (반드시 적용):**
+{template_structure}
 
-주제: 마일리지 프로그램 완전 가이드
+위 구조를 참고하여 동일한 패턴으로 작성하세요.
+"""
+        
+        return f"""당신은 한국어 여행/마일리지 전문 에디터입니다.
 
-구조:
-1. 제목 — 전체 통합본
-2. 개념 소개
-3. ## 1. 기본 개념
-4. ## 2. 등급 시스템 (비교표 포함)
-5. ## 3. 제휴 서비스
-6. ## 4. 사용 방법
-7. ## 5. 활용 팁
-8. ## 6. 부가 혜택
-9. ## 7. 실전 조언
-10. ## 8. 요약
+{comparison_instruction}
 
-요구사항:
-- {request.word_count}단어 분량
-- 테이블 3개 이상 포함
-- 링크 생성 금지
+{top3_instruction}
+
+{template_instruction}
+
+**🎯 제목 생성 규칙 (매우 중요):**
+- 창의적이고 감각적인 제목 필수: "집에서도 맛집 김치찌개! 황금 레시피 대공개"
+- 흥미를 끄는 표현: "놓치면 후회하는", "진짜 알아야 할", "숨겨진 비밀", "완벽한 공략법"
+- 구체적 혜택 강조: "5분만에 완성", "비용 50% 절약", "실패 없는 방법"
+- 감정적 호소: "이제 걱정 끝!", "드디어 찾았다", "정말 쉬워요"
+
+**📝 콘텐츠 품질 기준:**
+- 각 소제목마다 최소 3-4개 문단 작성 (문단당 최소 150자 이상)
+- 구체적 사례, 수치, 단계별 설명으로 내용 풍부하게 작성
+- 실무에 바로 활용 가능한 상세한 정보 포함
+- 표와 리스트를 활용하여 정보를 체계적으로 정리
+- **오직 실용적이고 현재 유용한 정보만 포함**
+
+**📊 테이블 생성 필수 규칙 (매우 중요):**
+- 비교 정보가 있으면 반드시 비교표 작성 (장단점, 가격, 특징, 차이점 등)
+- 단계별 과정은 단계표로 정리 (절차, 순서, 방법 등)  
+- 수치/통계 데이터는 데이터표로 작성 (요금, 시간, 비용, 성과 등)
+- 분류 정보는 분류표로 정리 (유형, 종류, 카테고리 등)
+- **케이스별 추천표 필수**: 상황/목적별로 어떤 선택을 해야 하는지 상세 표 작성
+- 각 주요 섹션마다 최소 1개 이상의 테이블 포함 필수
+- 전체 글에서 최소 6-8개의 테이블 필수 포함 (케이스별 추천표 포함)
+- 테이블은 정보 전달의 핵심 수단으로 활용
+
+**📋 요약박스 생성 필수 규칙:**
+- **글의 마지막 부분에 요약박스 필수 포함**
+- 요약박스 내용: 핵심 포인트 3-5개, 최종 추천사항, 주의사항
+- 요약박스 디자인: 눈에 띄는 스타일로 별도 박스 처리
+- "📋 핵심 요약" 또는 "💡 정리하면" 등의 제목 사용 
+
+**작성 원칙:**
+- {request.word_count}단어 분량 (HTML 태그 제외)
+- 테이블 5-7개 이상 포함 (필수){"" if not is_comparison_topic else " - 비교 주제는 비교표 최소 3개 필수"}
+- 브런치 포맷: H2/H3 섹션 구성
 - 톤: {request.tone}
 - 언어: {request.target_language}
 
 {language_instruction}
 
-응답 형식을 다음 JSON 구조로 제공해주세요:
+**🚨 중요: JSON 형식 준수 🚨**
+응답은 반드시 유효한 JSON 구조로 제공해주세요. HTML 속성의 따옴표는 반드시 \" 로 이스케이프해야 합니다.
+
+응답 형식:
 {{
-    "title": "○○○ 완전 정복 가이드 — 전체 통합본",
-    "html_content": "샘플과 같은 완전한 가이드 형태의 HTML 콘텐츠 (표, 구체적 정보, 실무 활용법 포함)",
-    "markdown_content": "샘플과 같은 체계적 구조의 마크다운 콘텐츠", 
+    "title": "창의적이고 매력적인 제목",
+    "html_content": "완전한 HTML 콘텐츠 (모든 HTML 속성의 따옴표는 반드시 \\\"로 이스케이프)",
+    "markdown_content": "체계적 구조의 마크다운 콘텐츠", 
     "summary": "2-3문장의 핵심 요약",
     "tags": ["실무", "가이드", "관련주제"],
 {image_instructions}
 }}
 
-**🎨 HTML 작성 규칙** (브런치 스타일):
-- **메인 제목**: <h1 style="color: #000000; font-size: 2.4em; font-weight: 700; margin-bottom: 0.5em; line-height: 1.2;">제목 — 전체 통합본</h1>
-- **도입부**: <div style="color: #000000; font-size: 1.1em; line-height: 1.8; margin-bottom: 2em; border-left: 3px solid #3498db; padding-left: 20px;">인트로 내용</div>
-- **섹션 제목**: <h2 style="color: #000000; font-size: 1.8em; font-weight: 600; margin-top: 2.5em; margin-bottom: 1em;">## 1. 섹션제목</h2>
-- **이미지 삽입**: <img src="이미지URL" alt="설명" style="width: 100%; max-width: 600px; height: auto; margin: 1.5em 0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-- **본문**: <p style="color: #000000; line-height: 1.8; font-size: 16px; margin-bottom: 1.5em;">상세한 본문 내용</p>
-- **강조**: <strong style="color: #e74c3c; font-weight: 600;">중요한 내용</strong>
-- **리스트**: <ul style="color: #000000; margin: 1em 0; padding-left: 20px;"><li style="margin-bottom: 0.8em; line-height: 1.6;">- 항목: 상세 설명</li></ul>
-- **테이블**: <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; border: 1px solid #ddd;"><thead><tr style="background: #f8f9fa;"><th style="border: 1px solid #ddd; padding: 12px; text-align: left; font-weight: 600; color: #000000;">항목</th><th style="border: 1px solid #ddd; padding: 12px; text-align: left; font-weight: 600; color: #000000;">기준</th><th style="border: 1px solid #ddd; padding: 12px; text-align: left; font-weight: 600; color: #000000;">혜택</th></tr></thead><tbody><tr><td style="border: 1px solid #ddd; padding: 12px; color: #000000;">내용</td></tr></tbody></table>
-- **팁 박스**: <div style="background: #f8f9fa; border-left: 4px solid #3498db; padding: 1.5em; margin: 2em 0; border-radius: 4px;"><p style="color: #000000; margin: 0; font-style: italic;">💡 실전 팁: 구체적인 조언</p></div>  
-- **구분선**: <hr style="border: none; border-top: 2px solid #e0e0e0; margin: 3em 0;">
-- **주의사항**: <span style="color: #e67e22; font-weight: 600; background: #fff3cd; padding: 2px 6px; border-radius: 4px;">⚠️ 주의사항</span>
+**JSON 작성 규칙:**
+- HTML 속성의 모든 따옴표는 \" 형태로 이스케이프 필수
+- 예시: "html_content": "<h1 style=\\"color: #000\\">제목</h1>"
+- 줄바꿈은 \\n으로 표현
+- 백슬래시는 \\\\로 이스케이프
+
+**🎨 HTML 스타일 참고** (JSON에 넣을 때는 반드시 따옴표 이스케이프!):
+- **메인 제목**: <h1 style="color: #2c3e50; font-size: 2.8em; font-weight: 800; margin-bottom: 0.8em; line-height: 1.2; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">창의적인 제목</h1>
+- **도입부**: <div style="color: #2c3e50; font-size: 1.2em; line-height: 1.9; margin-bottom: 3em; background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 50%, #ffeaa7 100%); padding: 30px; border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(10px); position: relative; overflow: hidden;">
+    <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); pointer-events: none;"></div>
+    <div style="position: relative; z-index: 1;">✨ 인트로 내용</div>
+</div>
+- **섹션 제목**: <h2 style="color: #2c3e50; font-size: 2.1em; font-weight: 700; margin-top: 3.5em; margin-bottom: 1.5em; background: linear-gradient(135deg, #74b9ff 0%, #0984e3 50%, #6c5ce7 100%); padding: 20px 30px; border-radius: 15px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); text-align: center; color: white; transform: perspective(1000px) rotateX(5deg); transition: all 0.3s ease;">🎯 섹션제목</h2>
+- **이미지 삽입**: <img src="이미지URL" alt="설명" style="width: 100%; max-width: 700px; height: auto; margin: 2em auto; display: block; border-radius: 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.2); border: 4px solid white; filter: brightness(1.05) contrast(1.1);">
+- **본문**: <p style="color: #2c3e50; line-height: 1.9; font-size: 17px; margin-bottom: 2em; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 25px; border-radius: 12px; border-left: 6px solid #74b9ff; box-shadow: 0 4px 16px rgba(0,0,0,0.08); font-weight: 400;">상세한 본문 내용</p>
+- **강조**: <strong style="color: white; font-weight: 700; background: linear-gradient(135deg, #e17055 0%, #d63031 50%, #e84393 100%); padding: 4px 10px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">중요한 내용</strong>
+- **리스트**: <ul style="color: #2c3e50; margin: 2em 0; padding: 25px; background: linear-gradient(135deg, #ddd6fe 0%, #c084fc 20%, #e879f9 100%); border-radius: 15px; box-shadow: 0 6px 24px rgba(0,0,0,0.12); list-style: none;"><li style="margin-bottom: 1em; line-height: 1.7; background: white; padding: 15px 20px; border-radius: 10px; margin: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #74b9ff; font-weight: 500; transition: all 0.3s ease;">🔹 항목: 상세 설명</li></ul>
+- **테이블**: <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin: 2em 0; border-radius: 15px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.15); background: white;"><thead><tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);"><th style="border: none; padding: 20px; text-align: center; font-weight: 700; color: white; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">항목</th><th style="border: none; padding: 20px; text-align: center; font-weight: 700; color: white; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">기준</th><th style="border: none; padding: 20px; text-align: center; font-weight: 700; color: white; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">혜택</th></tr></thead><tbody><tr style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);"><td style="border: none; padding: 18px; color: #2c3e50; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.05); font-weight: 500;">내용</td></tr></tbody></table>
+- **팁 박스**: <div style="background: linear-gradient(135deg, #fdcb6e 0%, #e17055 50%, #fd79a8 100%); border: none; padding: 25px; margin: 2.5em 0; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); position: relative; overflow: hidden;">
+    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%); pointer-events: none;"></div>
+    <p style="color: white; margin: 0; font-style: italic; font-weight: 600; font-size: 16px; position: relative; z-index: 1; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">💡 실전 팁: 구체적인 조언</p>
+</div>
+- **구분선**: <hr style="border: none; height: 4px; background: linear-gradient(90deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #667eea 75%, #764ba2 100%); margin: 4em 0; border-radius: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+- **주의사항**: <span style="color: white; font-weight: 700; background: linear-gradient(135deg, #ff6b6b 0%, #feca57 50%, #ff9ff3 100%); padding: 12px 20px; border-radius: 25px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); display: inline-block; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px;">⚠️ 주의사항</span>
+- **카드 박스**: <div style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); padding: 30px; margin: 25px 0; border-radius: 20px; box-shadow: 0 12px 48px rgba(0,0,0,0.12); border: 1px solid rgba(0,0,0,0.05); backdrop-filter: blur(10px); position: relative; overflow: hidden;">
+    <div style="position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; background: linear-gradient(135deg, #667eea, #764ba2, #f093fb); border-radius: 22px; z-index: -1;"></div>
+    카드 내용
+</div>
+- **링크 버튼**: <div style="text-align: center; margin: 25px 0;"><a href="#" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); color: white; text-decoration: none; font-weight: 700; font-size: 15px; padding: 15px 30px; border-radius: 50px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); transform: translateY(0); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-transform: uppercase; letter-spacing: 1px; position: relative; overflow: hidden;">
+    <span style="position: relative; z-index: 1;">버튼 텍스트</span>
+    <div style="position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); transition: all 0.5s;"></div>
+</a></div>
+- **요약박스**: <div style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 50%, #6c5ce7 100%); padding: 35px; margin: 3em 0; border-radius: 25px; box-shadow: 0 15px 50px rgba(0,0,0,0.2); border: 3px solid rgba(255,255,255,0.1); position: relative; overflow: hidden;">
+    <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%); pointer-events: none;"></div>
+    <h3 style="color: white; margin: 0 0 25px 0; font-size: 1.6em; font-weight: 800; text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.3); position: relative; z-index: 1;">📋 핵심 요약</h3>
+    <div style="color: white; line-height: 1.8; font-size: 16px; font-weight: 500; position: relative; z-index: 1; text-shadow: 0 1px 3px rgba(0,0,0,0.2);">요약 내용</div>
+</div>
 
 **중요: 절대 흰색(#ffffff, #fff, white) 또는 매우 밝은 색상을 사용하지 마세요.**
 
@@ -539,16 +860,20 @@ class ContentGenerator:
    - HTML 태그는 단어수에 포함되지 않습니다
    - <p>, <h1>, <div> 등 모든 태그 제외하고 순수 텍스트만 계산
    
-   📝 작성 전략:
-   - 현재 {request.word_count}단어는 상당히 긴 분량입니다
-   - 각 섹션을 매우 상세하고 길게 작성하세요
+   📝 작성 전략 (절대 준수):
+   - 현재 {request.word_count}단어는 상당히 긴 분량입니다 - 반드시 이 분량을 채워야 합니다
+   - 각 섹션을 매우 상세하고 길게 작성하세요 (섹션당 최소 150-200단어)
    - 구체적 예시, 상세한 설명, 실무 팁을 풍부하게 추가
-   - 8-10개 정도의 상세한 섹션으로 구성
-   - 단어수가 부족하면 반드시 더 많은 내용 추가"""
+   - 8-12개 정도의 상세한 섹션으로 구성 
+   - 단어수가 부족하면 반드시 더 많은 내용 추가
+   - 모든 문단은 최소 3-4문장 이상으로 구성
+   - 나열형 설명보다는 서술형 상세 설명 위주로 작성
+   - 반드시 {min_words}단어 이상 작성 - 이것은 절대 기준입니다!"""
             
         important_points = f"""{word_count_instruction}
 2. HTML 버전과 마크다운 버전 모두 제공하세요
-{image_instructions}4. **인라인 텍스트 링크 필수**: 콘텐츠 내용 중에 구체적인 장소, 서비스, 앱 언급 시 반드시 "(https://...)" 형태로 링크 추가
+{image_instructions}
+4. **인라인 텍스트 링크 필수**: 콘텐츠 내용 중에 구체적인 장소, 서비스, 앱 언급 시 반드시 "(https://...)" 형태로 링크 추가
    - 스탠리 파크 언급 시: "스탠리 파크(https://vancouver.ca/parks-recreation-culture/stanley-park.aspx)"
    - 환전 서비스: "환전하기(https://wise.com/kr/currency-converter/cad-to-krw-rate)"  
    - 교통 앱: "TransLink(https://www.translink.ca/)" + "Uber(https://www.uber.com/)"
@@ -562,7 +887,13 @@ class ContentGenerator:
 9. 절대 흰색(#ffffff, #fff, white)이나 매우 밝은 색상은 사용하지 마세요
 10. **섹션별 링크 금지**: 섹션 제목 뒤에 "자세히 보기", "바로가기" 등의 별도 링크 버튼을 만들지 마세요. 오직 인라인 링크만 사용
 11. **절대 Google 검색 링크 금지**: 어떤 경우에도 google.com/search 형태의 링크를 만들지 마세요
-12. **링크 생성 전면 금지**: 섹션별 링크, 외부 링크, 참조 링크 등 모든 <a> 태그 링크 생성을 하지 마세요"""
+12. **링크 생성 전면 금지**: 섹션별 링크, 외부 링크, 참조 링크 등 모든 <a> 태그 링크 생성을 하지 마세요
+
+**🔥 추가 필수 요구사항 (절대 준수):**
+13. **케이스별 추천표 반드시 포함**: 다양한 상황/목적에 따른 추천 항목을 표로 정리
+14. **요약박스 필수**: 글의 마지막에 핵심 내용을 정리한 요약박스를 반드시 포함하세요
+15. **이미지는 실제 img 태그로 생성**: 텍스트 설명이 아닌 실제 <img> 태그를 사용하세요
+16. **다중 항목 주제의 경우**: 명시된 숫자만큼 정확히 모든 선택지/항목을 다뤄야 합니다"""
 
     def _get_tone_specific_guidelines(self, tone: str) -> str:
         """Get tone-specific content guidelines to avoid inappropriate content."""
@@ -599,12 +930,51 @@ class ContentGenerator:
         if request.include_images:
             image_instructions = "3. **섹션별 관련 이미지**: 각 주요 섹션 제목에 직접 관련된 구체적인 이미지 3-5개 포함 (예: '대한항공' 섹션 → 대한항공/항공기 이미지)\n"
         
-        # Calculate target range - use 10% margin as requested
-        margin = max(200, int(request.word_count * 0.1))  # 10% or minimum 200 words
-        min_words = request.word_count - margin
-        max_words = request.word_count + margin
+        # Handle multiple options if requested
+        num_options = getattr(request, 'num_options', 1)
+        balance_word_count = getattr(request, 'balance_word_count', True)
         
-        word_count_instruction = f"""1. **🚨 절대적 단어수 준수 🚨**: HTML 태그를 완전히 제외한 순수 텍스트가 반드시 {min_words}-{max_words}단어 사이여야 합니다.
+        # Temporarily disable multiple options to fix content generation issue
+        if num_options > 1:
+            print(f"DEBUG: Multiple options requested ({num_options}) but temporarily using single option for stability")
+            num_options = 1
+        
+        # Calculate target range and word distribution
+        if num_options > 1 and balance_word_count:
+            # Distribute total word count across options
+            base_count_per_option = request.word_count // num_options
+            remainder = request.word_count % num_options
+            
+            # Calculate margins for each option
+            margin = max(100, int(base_count_per_option * 0.1))
+            min_words = base_count_per_option - margin
+            max_words = base_count_per_option + margin
+            
+            word_count_instruction = f"""1. **🚨 절대적 단어수 준수 (다중 선택지) 🚨**: 
+   - **총 {num_options}개 선택지 생성**
+   - **각 선택지별 목표**: {base_count_per_option}단어 (HTML 태그 제외)
+   - **각 선택지별 허용 범위**: {min_words}-{max_words}단어 
+   - **선택지별 글자수 균형**: 각 선택지가 비슷한 분량을 가져야 합니다
+   
+   ⚠️ 중요 작성 지침:
+   - 전체 {request.word_count}단어를 {num_options}개 선택지로 균등 분배
+   - 선택지 1: 약 {base_count_per_option + (1 if remainder > 0 else 0)}단어
+   - 선택지 2: 약 {base_count_per_option + (1 if remainder > 1 else 0)}단어
+   {f"- 선택지 3: 약 {base_count_per_option + (1 if remainder > 2 else 0)}단어" if num_options > 2 else ""}
+   {f"- 선택지 4: 약 {base_count_per_option + (1 if remainder > 3 else 0)}단어" if num_options > 3 else ""}
+   {f"- 선택지 5: 약 {base_count_per_option + (1 if remainder > 4 else 0)}단어" if num_options > 4 else ""}
+   
+   📝 각 선택지 작성 전략:
+   - 각 선택지는 동일한 주제를 다른 관점/구조로 접근
+   - 각 선택지마다 {base_count_per_option}단어 내외로 균등 분배
+   - 선택지간 중복 내용 최소화, 각각 독특한 가치 제공"""
+        else:
+            # Single option - original logic
+            margin = max(200, int(request.word_count * 0.1))
+            min_words = request.word_count - margin
+            max_words = request.word_count + margin
+            
+            word_count_instruction = f"""1. **🚨 절대적 단어수 준수 🚨**: HTML 태그를 완전히 제외한 순수 텍스트가 반드시 {min_words}-{max_words}단어 사이여야 합니다.
    
    ⚠️ 중요 계산 방식:
    - 목표 단어수: {request.word_count}단어
@@ -612,16 +982,20 @@ class ContentGenerator:
    - HTML 태그는 단어수에 포함되지 않습니다
    - <p>, <h1>, <div> 등 모든 태그 제외하고 순수 텍스트만 계산
    
-   📝 작성 전략:
-   - 현재 {request.word_count}단어는 상당히 긴 분량입니다
-   - 각 섹션을 매우 상세하고 길게 작성하세요
+   📝 작성 전략 (절대 준수):
+   - 현재 {request.word_count}단어는 상당히 긴 분량입니다 - 반드시 이 분량을 채워야 합니다
+   - 각 섹션을 매우 상세하고 길게 작성하세요 (섹션당 최소 150-200단어)
    - 구체적 예시, 상세한 설명, 실무 팁을 풍부하게 추가
-   - 8-10개 정도의 상세한 섹션으로 구성
-   - 단어수가 부족하면 반드시 더 많은 내용 추가"""
+   - 8-12개 정도의 상세한 섹션으로 구성 
+   - 단어수가 부족하면 반드시 더 많은 내용 추가
+   - 모든 문단은 최소 3-4문장 이상으로 구성
+   - 나열형 설명보다는 서술형 상세 설명 위주로 작성
+   - 반드시 {min_words}단어 이상 작성 - 이것은 절대 기준입니다!"""
             
         important_points = f"""{word_count_instruction}
 2. HTML 버전과 마크다운 버전 모두 제공하세요
-{image_instructions}4. **인라인 텍스트 링크 필수**: 콘텐츠 내용 중에 구체적인 장소, 서비스, 앱 언급 시 반드시 "(https://...)" 형태로 링크 추가
+{image_instructions}
+4. **인라인 텍스트 링크 필수**: 콘텐츠 내용 중에 구체적인 장소, 서비스, 앱 언급 시 반드시 "(https://...)" 형태로 링크 추가
    - 스탠리 파크 언급 시: "스탠리 파크(https://vancouver.ca/parks-recreation-culture/stanley-park.aspx)"
    - 환전 서비스: "환전하기(https://wise.com/kr/currency-converter/cad-to-krw-rate)"  
    - 교통 앱: "TransLink(https://www.translink.ca/)" + "Uber(https://www.uber.com/)"
@@ -637,40 +1011,342 @@ class ContentGenerator:
 11. **절대 Google 검색 링크 금지**: 어떤 경우에도 google.com/search 형태의 링크를 만들지 마세요
 12. **링크 생성 전면 금지**: 섹션별 링크, 외부 링크, 참조 링크 등 모든 <a> 태그 링크 생성을 하지 마세요"""
 
+        # Detect comparison topic again for user prompt
+        is_comparison_topic = any(keyword in request.topic.lower() for keyword in ['vs', 'versus', '대', '비교', '차이'])
+        
+        # Enhanced topic categorization system
+        topic_lower = request.topic.lower()
+        
+        # Detect specific transportation/direction topics only
+        is_transportation_topic = (
+            any(keyword in topic_lower for keyword in ['가는법', '가는방법', '이동하는법', '교통수단']) and
+            any(direction_keyword in topic_lower for direction_keyword in ['에서', '까지', '로 가는', '로 이동', 'how to get to', 'way to'])
+        )
+        
+        # Detect food/cuisine topics
+        is_food_topic = any(keyword in topic_lower for keyword in [
+            '맛집', '음식', '요리', '레시피', '만드는법', '재료', '조리법', '음식점', '식당', '카페', 
+            'food', 'restaurant', 'recipe', 'cooking', 'cuisine', 'dish'
+        ])
+        
+        # Detect health/medicine topics
+        is_health_topic = any(keyword in topic_lower for keyword in [
+            '병원', '의료', '건강', '질병', '약', '치료', '증상', '아플때', '몸이',
+            'health', 'medicine', 'medical', 'treatment', 'symptoms', 'doctor'
+        ])
+        
+        # Detect weather topics
+        is_weather_topic = any(keyword in topic_lower for keyword in [
+            '날씨', '기온', '비', '눈', '바람', '습도', '태풍', '온도',
+            'weather', 'temperature', 'rain', 'snow', 'wind', 'humidity'
+        ])
+        
+        # Detect music/entertainment topics
+        is_music_topic = any(keyword in topic_lower for keyword in [
+            '음악', '노래', '가수', '앨범', '듣기좋은', '플레이리스트', '장르',
+            'music', 'song', 'artist', 'album', 'playlist', 'genre'
+        ])
+        
+        # Detect tourist attraction topics
+        is_tourism_topic = any(keyword in topic_lower for keyword in [
+            '관광', '명소', '여행지', '볼거리', '여행', '관광지', '휴양지', '데이트코스',
+            'tourism', 'attraction', 'sightseeing', 'travel destination', 'tourist spot'
+        ]) and not is_transportation_topic  # Exclude if it's about transportation
+        
+        # Detect TOP/ranking topic again for user prompt
+        import re
+        topic_lower = request.topic.lower()
+        ranking_number_user = None
+        is_ranking_topic_user = False
+        
+        # Check for TOP patterns for user prompt
+        top_patterns = [
+            r'top\s*(\d+)', r'톱\s*(\d+)', r'베스트\s*(\d+)', r'best\s*(\d+)', 
+            r'추천\s*(\d+)', r'(\d+)가지', r'(\d+)개', r'(\d+)종류', 
+            r'(\d+)위', r'(\d+)순위'
+        ]
+        
+        for pattern in top_patterns:
+            match = re.search(pattern, topic_lower)
+            if match:
+                ranking_number_user = int(match.group(1))
+                is_ranking_topic_user = True
+                break
+        
+        # Also check Korean numbers for user prompt
+        korean_numbers = {
+            '세': 3, '삼': 3, '네': 4, '사': 4, '다섯': 5, '오': 5,
+            '여섯': 6, '육': 6, '일곱': 7, '칠': 7, '여덟': 8, '팔': 8,
+            '아홉': 9, '구': 9, '열': 10
+        }
+        
+        for korean_num, num_val in korean_numbers.items():
+            if korean_num in topic_lower and ('가지' in topic_lower or '개' in topic_lower):
+                ranking_number_user = num_val
+                is_ranking_topic_user = True
+                break
+        
+        comparison_reminder = ""
+        top_reminder = ""
+        
+        # Generate TOP reminder if it's a ranking topic
+        if is_ranking_topic_user and ranking_number_user:
+            ranking_emojis = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+            section_list = []
+            
+            for i in range(ranking_number_user):
+                rank_num = i + 1
+                emoji = ranking_emojis[i] if i < len(ranking_emojis) else f"{rank_num}️⃣"
+                section_list.append(f"- ## {emoji} {rank_num}위 (또는 TOP{rank_num}): [구체적 항목명] - 매우 상세한 설명 (최소 400-500단어)")
+            
+            sections_text = '\n'.join(section_list)
+            
+            top_reminder = f"""
+**🏆 TOP{ranking_number_user}/순위 주제 절대 필수사항 (매우 중요!):**
+주제 "{request.topic}"는 TOP{ranking_number_user} 순위 주제입니다. 반드시 다음을 지켜주세요:
+
+**📊 필수 구조 (절대 준수):**
+{sections_text}
+
+**⚠️ 절대 규칙:**
+- **정확히 {ranking_number_user}개 항목** 모두 포함 (하나도 빠뜨리면 안됨)
+- **각 항목별로 큰 독립 섹션** 구성 (작은 카드로 쪼개지 말고)
+- **모든 항목 균등한 분량** (400-500단어씩)
+- **종합 랭킹 비교표 필수** - {ranking_number_user}개 항목 한눈에 비교
+- **선택 가이드표 필수** - 상황별 추천 가이드
+
+"""
+        
+        if is_comparison_topic:
+            comparison_reminder = f"""
+**🔥 비교 주제 필수 준수사항 (매우 중요!):**
+주제 "{request.topic}"는 비교 주제입니다. 반드시 다음을 지켜주세요:
+- 양쪽 모두 동등한 분량과 깊이로 다루기 (예: 동부힙합 40% + 서부힙합 40% + 비교분석 20%)
+- 각 측면의 특징, 장단점, 대표 사례를 상세히 설명
+- 직접 비교표 최소 3개 필수: ①기본 특징 비교 ②장단점 비교 ③선택 가이드 비교
+- 편향 없는 균형잡힌 시각 유지
+- 상황별 추천 가이드 제공
+
+**⚠️ 절대 필수: HTML 비교표 3개 이상 생성**
+각 비교표는 반드시 다음과 같은 완전한 HTML table 구조를 사용하세요:
+
+```html
+<table style="border-collapse: collapse; width: 100%; margin: 25px 0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+<thead>
+<tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+<th style="padding: 15px 20px; text-align: left; font-weight: 600; border: none;">구분</th>
+<th style="padding: 15px 20px; text-align: left; font-weight: 600; border: none;">동부힙합</th>
+<th style="padding: 15px 20px; text-align: left; font-weight: 600; border: none;">서부힙합</th>
+</tr>
+</thead>
+<tbody>
+<tr style="transition: background-color 0.3s ease;">
+<td style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;">특징1</td>
+<td style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;">동부 특징</td>
+<td style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;">서부 특징</td>
+</tr>
+<tr style="background-color: #f8f9ff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;">특징2</td>
+<td style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;">동부 특징2</td>
+<td style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;">서부 특징2</td>
+</tr>
+</tbody>
+</table>
+```
+
+**비교표 없이는 응답하지 마세요!**
+
+"""
+
         return f"""주제: {request.topic}
 
-완전한 가이드를 작성해주세요.
+템플릿을 참고하여 매우 상세하고 풍부한 완전 가이드를 작성해주세요.
 
-구조:
-# [주제] 가이드 — 전체 통합본
-> 도입부
+{comparison_reminder}
 
-## 1. 기본 개념
-## 2. 등급 시스템 (표 포함)
-## 3. 제휴 서비스
-## 4. 사용 방법  
-## 5. 활용 팁
-## 6. 부가 혜택
-## 7. 실전 조언
-## 8. 요약
+{top_reminder}
 
-요구사항:
-- {min_words}-{max_words}단어
-- 테이블 3개 이상
-- 링크 생성 안함
+**🚫 절대 금지 (매우 중요):**
+- "자세히 보기", "바로가기", "더 보기", "상세 보기" 링크 버튼 절대 생성 금지
+- <a> 태그 사용 절대 금지
+- 모든 외부 링크 절대 금지
+- 역사, 배경, 기원, 유래 등 역사적 내용 절대 포함 금지
+- "~가이드", "~완전정복", "~총정리" 같은 뻔한 제목 패턴 절대 금지
+- Wikipedia, 외부 웹사이트의 실제 이미지 URL 사용 절대 금지
+- <img> 태그에 실제 URL 넣지 마세요 - 이미지는 별도 처리됩니다
+- **🚫 이미지 관련 텍스트 절대 금지**: "이미지", "사진", "그림", "관련 이미지", "대표 이미지", "상징하는 이미지" 등 모든 이미지 관련 텍스트 설명 절대 금지
+- **🚫 이미지 설명문 절대 금지**: "(동부힙합을 상징하는 이미지)", "(관련 사진)", "(대표 이미지)" 같은 모든 형태의 이미지 설명문 생성 절대 금지
+- **🚫 이미지 태그 금지**: <img> 태그나 이미지 관련 HTML 태그 직접 생성 절대 금지 - 이미지는 시스템에서 자동 처리됩니다
+
+**📋 상세 작성 요구사항:**
+각 소제목마다 다음을 반드시 포함:
+- 최소 3-4개의 상세한 문단 (각 문단 150자 이상)
+- 구체적인 사례와 실제 수치 제시
+- 단계별 상세 설명 (1단계 → 2단계 → 3단계)
+- 주의사항과 제한 조건 명시
+- 실무 팁과 노하우 포함
+
+**🎯 제목 작성 예시:**
+- 김치찌개 → "집에서도 맛집 김치찌개! 황금 레시피 대공개"
+- 신용카드 포인트 → "놓치면 손해! 신용카드 포인트 200% 활용 비법"
+- 마일리지 적립 → "이제 걱정 끝! 마일리지 폭탄 적립 완벽 공략"
+
+**핵심 구조 (매우 상세하게):**
+# [창의적이고 매력적인 제목]
+> 한 줄 요약 (실용적 혜택 강조)
+
+## 🎯 어디로 갈까? (개요 설명)
+
+## 🚀 선택 1) 첫 번째 방법 (3-4문단으로 상세 설명)
+**⚠️ 절대 필수**: 선택 1, 2, 3을 모두 동일한 분량으로 작성해야 합니다!
+
+## 🚗 선택 2) 두 번째 방법 (3-4문단으로 상세 설명)
+**⚠️ 절대 필수**: 선택 1과 동일한 길이와 상세함으로 작성
+
+## 🚌 선택 3) 세 번째 방법 (3-4문단으로 상세 설명)
+**⚠️ 절대 필수**: 선택 1, 2와 동일한 수준의 분량과 상세함으로 작성
+
+## 📊 한눈에 비교 표 (상세 비교표)
+## 🎯 케이스별 추천 (각 케이스마다 상세 설명)
+## ❓ 자주 묻는 질문(FAQ) (5개 이상, 각각 상세 답변)
+## 📝 요약 박스 (핵심 정리)
+
+**품질 기준:**
+- {min_words}-{max_words}단어 (매우 풍부한 내용)
+- 테이블 5-7개 이상{"" if not is_comparison_topic else " (비교 주제는 비교표 3개 필수)"}
+- 링크 절대 생성 금지
 - 톤: {request.tone}
 
 {important_points}"""
+        
+        # Add topic-specific guidance based on detected topic type
+        topic_specific_guidance = ""
+        
+        if is_transportation_topic:
+            topic_specific_guidance = """
+
+🚨 **교통/이동방법 주제 특별 요구사항:**
+- **구체적인 교통수단 상세 설명**: 버스, 지하철, 택시, 자동차, 도보, 자전거, 기차, 항공편 등
+- **실용적 정보 필수 포함**: 소요시간, 정확한 요금, 노선번호, 정류장명, 환승방법
+- **단계별 이동 경로**: 출발지 → 경유지 → 목적지까지 상세한 순서 설명
+- **시간표 정보**: 운행간격, 첫차/막차 시간, 주말/평일 차이점
+
+**각 선택지별 필수 내용:**
+- 선택 1: 가장 빠른 이동방법 (시간 중심)
+- 선택 2: 가장 경제적인 이동방법 (비용 중심)  
+- 선택 3: 가장 편리한 이동방법 (편의성 중심)"""
+
+        elif is_food_topic:
+            topic_specific_guidance = """
+
+🍽️ **음식/요리 주제 특별 요구사항:**
+- **재료 및 조리법 상세 설명**: 필수 재료, 대체 재료, 정확한 계량, 조리 순서
+- **맛집 정보**: 위치, 대표 메뉴, 가격대, 영업시간, 예약 방법
+- **영양 정보**: 칼로리, 영양소, 건강 효과, 주의사항
+- **보관 및 섭취 팁**: 보관법, 먹는 방법, 곁들일 음식
+
+**각 선택지별 필수 내용:**
+- 선택 1: 전통적/정통 방식 
+- 선택 2: 간편한/현대적 방식
+- 선택 3: 고급/특별한 방식"""
+
+        elif is_health_topic:
+            topic_specific_guidance = """
+
+🏥 **건강/의료 주제 특별 요구사항:**
+- **증상 및 원인 설명**: 구체적 증상, 발생 원인, 진행 과정
+- **예방 및 관리법**: 생활습관 개선, 주의사항, 예방법
+- **전문 의료진 조언**: 병원 진료 시기, 검사 방법, 치료 옵션
+- **⚠️ 면책조항**: "본 정보는 일반적인 건강 정보이며, 개인별 상황에 따라 다를 수 있습니다. 정확한 진단과 치료는 반드시 의료진과 상담하세요."
+
+**각 선택지별 필수 내용:**
+- 선택 1: 즉시 대처법 (응급 상황)
+- 선택 2: 생활 관리법 (일상 관리)
+- 선택 3: 전문 치료법 (의료진 상담)"""
+
+        elif is_weather_topic:
+            topic_specific_guidance = """
+
+🌤️ **날씨/기후 주제 특별 요구사항:**
+- **기상 정보 상세 분석**: 온도, 습도, 강수확률, 바람, 자외선 지수
+- **계절별/지역별 특성**: 지역 기후 특징, 계절별 변화, 극값 정보
+- **생활 영향 및 대비**: 옷차림, 외출 준비, 건강 관리, 농업/산업 영향
+- **날씨 예보 해석**: 기상청 용어 설명, 확률 의미, 주의보/경보
+
+**각 선택지별 필수 내용:**
+- 선택 1: 단기 예보 (1-3일)
+- 선택 2: 중기 예보 (1주일)  
+- 선택 3: 장기 전망 (계절/연간)"""
+
+        elif is_music_topic:
+            topic_specific_guidance = """
+
+🎵 **음악/엔터테인먼트 주제 특별 요구사항:**
+- **장르 및 특성 분석**: 음악적 특징, 대표 아티스트, 역사적 배경
+- **추천 리스트**: 상황별 추천곡, 플레이리스트 구성, 분위기별 선곡
+- **감상 포인트**: 악기 구성, 보컬 특징, 가사 해석, 프로듀싱 기법
+- **접근 방법**: 스트리밍 서비스, 음원 구매, 콘서트 정보
+
+**각 선택지별 필수 내용:**
+- 선택 1: 클래식/정통 추천
+- 선택 2: 인기/트렌드 추천
+- 선택 3: 숨은 명곡/마니아 추천"""
+
+        elif is_tourism_topic:
+            topic_specific_guidance = """
+
+🗺️ **관광/여행지 주제 특별 요구사항:**
+- **명소 상세 정보**: 위치, 특징, 볼거리, 역사적 의미, 최적 관람 시간
+- **실용 정보**: 입장료, 운영시간, 주차, 대중교통 접근법, 주변 편의시설
+- **계절별/시간별 특징**: 계절별 매력, 시간대별 추천, 혼잡도 정보
+- **주변 관광 코스**: 인근 명소, 추천 코스, 소요시간, 연계 여행
+
+**각 선택지별 필수 내용:**
+- 선택 1: 대표 명소 (Must-See)
+- 선택 2: 숨은 명소 (Hidden Gems)
+- 선택 3: 체험 활동 (Activities)"""
+
+        else:
+            # Universal guidance for all other topics
+            topic_specific_guidance = f"""
+
+🎯 **"{request.topic}" 주제 맞춤 요구사항:**
+- **주제의 핵심 가치**: 해당 주제가 사용자에게 제공하는 실질적 가치와 혜택을 명확히 설명
+- **단계별 접근법**: 초보자부터 숙련자까지 단계별로 접근할 수 있는 방법 제시
+- **실용적 팁과 노하우**: 실제 경험에서 나오는 유용한 팁과 주의사항
+- **다양한 관점 제시**: 여러 각도에서 주제를 바라보고 균형잡힌 시각 제공
+
+**각 선택지별 필수 내용:**
+- 선택 1: 기본/입문자 접근법
+- 선택 2: 중급/실용적 접근법  
+- 선택 3: 고급/전문가 접근법
+
+**주제 정확성 절대 준수**: 반드시 "{request.topic}"와 직접 관련된 내용만 작성하고, 다른 주제로 벗어나지 마세요."""
+
+        if topic_specific_guidance:
+            prompt += topic_specific_guidance
+        
+        return prompt
     
     def _parse_ai_response(self, ai_content: str, request: GenerationRequest) -> GeneratedContent:
         """Parse AI response into GeneratedContent."""
         try:
+            # Remove markdown code blocks if present
+            content = ai_content.strip()
+            if content.startswith('```json'):
+                content = content[7:]  # Remove ```json
+            if content.startswith('```'):
+                content = content[3:]   # Remove ```
+            if content.endswith('```'):
+                content = content[:-3]  # Remove closing ```
+            content = content.strip()
+            
             # Try to extract JSON from the response
-            start_idx = ai_content.find('{')
-            end_idx = ai_content.rfind('}') + 1
+            start_idx = content.find('{')
+            end_idx = content.rfind('}') + 1
             
             if start_idx != -1 and end_idx > start_idx:
-                json_str = ai_content[start_idx:end_idx]
+                json_str = content[start_idx:end_idx]
                 data = json.loads(json_str)
                 
                 # Process images data - now ImageInfo is dict-based so should be safe
@@ -686,13 +1362,104 @@ class ContentGenerator:
                                 caption=img.get("caption", "")
                             ))
                 
+                # Handle multiple options if present
+                num_options = getattr(request, 'num_options', 1)
+                balance_word_count = getattr(request, 'balance_word_count', True)
+                
+                if num_options > 1:
+                    # Check if AI response contains multiple options
+                    options_data = data.get("options", [])
+                    if options_data and len(options_data) >= num_options:
+                        # Process multiple options
+                        processed_options = []
+                        contents_for_balancing = []
+                        
+                        for option_data in options_data[:num_options]:
+                            option_content = option_data.get("html_content", option_data.get("content", ""))
+                            contents_for_balancing.append(option_content)
+                        
+                        # Apply word count balancing if enabled
+                        if balance_word_count:
+                            contents_for_balancing = self._balance_word_counts(
+                                contents_for_balancing, 
+                                request.word_count, 
+                                num_options
+                            )
+                        
+                        # Create GeneratedContent for each option
+                        for i, (option_data, balanced_content) in enumerate(zip(options_data[:num_options], contents_for_balancing)):
+                            actual_word_count = self._calculate_word_count(balanced_content)
+                            option = GeneratedContent(
+                                title=option_data.get("title", f"Option {i+1}: {request.topic}"),
+                                content=balanced_content,
+                                markdown_content=option_data.get("markdown_content"),
+                                summary=option_data.get("summary"),
+                                tags=option_data.get("tags", []),
+                                images=processed_images,
+                                word_count_actual=actual_word_count
+                            )
+                            processed_options.append(option)
+                        
+                        # Return first option as main content with options array
+                        main_content = processed_options[0] if processed_options else None
+                        if main_content:
+                            main_content.options = processed_options[1:] if len(processed_options) > 1 else None
+                            return main_content
+                
+                # Single option or fallback
+                main_content = data.get("html_content", data.get("content", ai_content))
+                nested_data = None
+                
+                # Check if main_content is nested JSON (common AI response issue)
+                if isinstance(main_content, str) and main_content.strip().startswith('```json'):
+                    try:
+                        # Extract JSON from nested format
+                        nested_content = main_content.strip()
+                        if nested_content.startswith('```json'):
+                            nested_content = nested_content[7:]  # Remove ```json
+                        if nested_content.startswith('```'):
+                            nested_content = nested_content[3:]   # Remove ```
+                        if nested_content.endswith('```'):
+                            nested_content = nested_content[:-3]  # Remove closing ```
+                        nested_content = nested_content.strip()
+                        
+                        # Try to parse the nested JSON
+                        nested_start = nested_content.find('{')
+                        nested_end = nested_content.rfind('}') + 1
+                        if nested_start != -1 and nested_end > nested_start:
+                            nested_json = nested_content[nested_start:nested_end]
+                            nested_data = json.loads(nested_json)
+                            # Use the html_content from the nested JSON
+                            main_content = nested_data.get("html_content", nested_data.get("content", main_content))
+                            print(f"DEBUG: Fixed nested JSON content, new length: {len(main_content)}")
+                    except Exception as e:
+                        print(f"DEBUG: Failed to parse nested JSON: {e}")
+                        # Keep original content if parsing fails
+                        pass
+                
+                actual_word_count = self._calculate_word_count(main_content)
+                
+                # Extract other fields, preferring nested JSON if available
+                if nested_data:
+                    title = nested_data.get("title", data.get("title", f"Content about {request.topic}"))
+                    markdown_content = nested_data.get("markdown_content", data.get("markdown_content"))
+                    summary = nested_data.get("summary", data.get("summary"))
+                    tags = nested_data.get("tags", data.get("tags", []))
+                    print(f"DEBUG: Using nested JSON fields - title: {title[:50] if title else 'None'}...")
+                else:
+                    title = data.get("title", f"Content about {request.topic}")
+                    markdown_content = data.get("markdown_content")
+                    summary = data.get("summary")
+                    tags = data.get("tags", [])
+                
                 return GeneratedContent(
-                    title=data.get("title", f"Content about {request.topic}"),
-                    content=data.get("html_content", data.get("content", ai_content)),
-                    markdown_content=data.get("markdown_content"),
-                    summary=data.get("summary"),
-                    tags=data.get("tags", []),
-                    images=processed_images
+                    title=title,
+                    content=main_content,
+                    markdown_content=markdown_content,
+                    summary=summary,
+                    tags=tags,
+                    images=processed_images,
+                    word_count_actual=actual_word_count
                 )
             else:
                 # Fallback: treat entire response as content  
@@ -723,8 +1490,7 @@ class ContentGenerator:
         if not html_content:
             return html_content
         
-        # Patterns to find colors that should be replaced with black
-        # Keep only emphasis colors (#e74c3c, #2980b9, #e67e22, #3498db) and replace everything else with black
+        # More aggressive pattern matching to ensure all non-emphasis colors become black
         color_patterns = [
             r'color:\s*#fff\b',
             r'color:\s*#ffffff\b', 
@@ -734,7 +1500,16 @@ class ContentGenerator:
             r'color:\s*rgb\(\s*25[0-5],\s*25[0-5],\s*25[0-5]\s*\)',  # RGB white/near-white
             r'color:\s*#2c3e50\b',  # Replace gray with black
             r'color:\s*#27ae60\b',  # Replace green with black (for headings)
-            r'color:\s*#[a-fA-F0-9]{6}\b(?!.*(?:#e74c3c|#2980b9|#e67e22|#3498db|#000000))',  # Replace any hex color except emphasis colors and black
+            r'color:\s*#74b9ff\b',  # Replace light blue with black
+            r'color:\s*#667eea\b',  # Replace purple with black
+            r'color:\s*#3f4c6b\b',  # Replace dark blue with black
+            r'color:\s*#555\b',     # Replace medium gray with black
+            r'color:\s*#666\b',     # Replace medium gray with black
+            r'color:\s*#777\b',     # Replace light gray with black
+            r'color:\s*#888\b',     # Replace lighter gray with black
+            r'color:\s*#999\b',     # Replace very light gray with black
+            # Replace ANY hex color that isn't black or emphasis colors
+            r'color:\s*#(?!000000|e74c3c|2980b9|e67e22|3498db)[0-9a-fA-F]{6}\b',
         ]
         
         # Default replacement color (black)
@@ -745,11 +1520,28 @@ class ContentGenerator:
         for pattern in color_patterns:
             fixed_html = re.sub(pattern, f'color: {replacement_color}', fixed_html, flags=re.IGNORECASE)
         
-        # Ensure all text without explicit color is black
-        # Add default black color to elements that don't have color specified
-        if 'color:' not in fixed_html:
-            # Wrap content with default black color
-            fixed_html = f'<div style="color: #000000;">{fixed_html}</div>'
+        # Force black color on common text elements - simplified approach without complex regex
+        text_elements = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'li', 'td', 'th']
+        for element in text_elements:
+            # Simple pattern to find elements with style attributes
+            pattern = rf'<{element}([^>]*?)style="([^"]*?)"([^>]*?)>'
+            
+            def add_color_if_missing(match):
+                pre = match.group(1)
+                style = match.group(2)
+                post = match.group(3)
+                if 'color:' not in style.lower():
+                    if not style.endswith(';'):
+                        style += ';'
+                    style += ' color: #000000;'
+                return f'<{element}{pre}style="{style}"{post}>'
+            
+            try:
+                fixed_html = re.sub(pattern, add_color_if_missing, fixed_html, flags=re.IGNORECASE)
+            except re.error:
+                # If regex fails, skip this element
+                print(f"Regex error for element {element}, skipping...")
+                continue
         
         return fixed_html
     
@@ -802,8 +1594,8 @@ class ContentGenerator:
             url = match.group(2)
             
             # Create styled HTML link
-            return f'<a href="{url}" target="_blank" rel="noopener noreferrer" style="color: #3498db; text-decoration: none; font-weight: 500;">{text}</a>'
-        
+            return f'<a href="{url}" target="_blank" style="color: #3498db; text-decoration: none; font-weight: 500;">{text}</a>'
+
         # Replace all inline links
         processed_html = re.sub(inline_link_pattern, replace_inline_link, html_content)
         
@@ -852,29 +1644,307 @@ class ContentGenerator:
         
         return cleaned_content
     
+    def _insert_images_into_content(self, html_content: str, images: list) -> str:
+        """Insert provided images into HTML content, replacing any existing img tags."""
+        import re
+        
+        if not images or not html_content:
+            return html_content
+        
+        # Remove any existing img tags from AI-generated content
+        html_content = re.sub(r'<img[^>]*>', '', html_content, flags=re.IGNORECASE)
+        
+        # Remove image description texts that AI might have generated
+        image_text_patterns = [
+            r'\([^)]*이미지[^)]*\)',
+            r'\([^)]*사진[^)]*\)',
+            r'\([^)]*그림[^)]*\)',
+            r'\([^)]*픽쳐[^)]*\)',
+            r'\([^)]*picture[^)]*\)',
+            r'\([^)]*photo[^)]*\)',
+            r'[가-힣]*이미지[가-힣]*',
+            r'[가-힣]*사진[가-힣]*',
+            r'[가-힣]*그림[가-힣]*',
+            r'관련\s*이미지',
+            r'상징하는\s*이미지',
+            r'대표\s*이미지',
+            r'.*를\s*상징하는\s*이미지',
+            r'.*에\s*관련된\s*이미지',
+            r'.*의\s*대표\s*이미지',
+            r'TOP\d+.*이미지',
+            r'\d+위.*이미지',
+            r'랭킹.*이미지',
+            r'순위.*이미지'
+        ]
+        
+        for pattern in image_text_patterns:
+            html_content = re.sub(pattern, '', html_content, flags=re.IGNORECASE)
+        
+        # Clean up extra spaces left from removal
+        html_content = re.sub(r'\s+', ' ', html_content)
+        html_content = re.sub(r'>\s+<', '><', html_content)
+        
+        # Find good insertion points (after h2 or h3 headers)
+        insertion_points = []
+        h2_matches = re.finditer(r'</h2>', html_content, re.IGNORECASE)
+        h3_matches = re.finditer(r'</h3>', html_content, re.IGNORECASE)
+        
+        for match in h2_matches:
+            insertion_points.append(match.end())
+        for match in h3_matches:
+            insertion_points.append(match.end())
+            
+        insertion_points = sorted(insertion_points)
+        
+        if not insertion_points:
+            # If no headers found, insert at the beginning
+            insertion_points = [0]
+        
+        # Insert images at strategic points
+        inserted_count = 0
+        offset = 0
+        
+        for i, image in enumerate(images[:min(len(images), len(insertion_points))]):
+            if inserted_count >= len(insertion_points):
+                break
+                
+            point = insertion_points[inserted_count] + offset
+            
+            # Create image HTML
+            image_url = image.get('url') if isinstance(image, dict) else getattr(image, 'url', '')
+            image_alt = image.get('alt') if isinstance(image, dict) else getattr(image, 'alt', f'관련 이미지 {i+1}')
+            image_caption = image.get('caption') if isinstance(image, dict) else getattr(image, 'caption', '')
+            
+            img_html = f"""
+<div style="text-align: center; margin: 20px 0;">
+    <img src="{image_url}" alt="{image_alt}" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
+    {f'<p style="margin-top: 8px; font-size: 14px; color: #666; font-style: italic;">{image_caption}</p>' if image_caption else ''}
+</div>"""
+            
+            html_content = html_content[:point] + img_html + html_content[point:]
+            offset += len(img_html)
+            inserted_count += 1
+        
+        return html_content
+    
+    async def _replace_placeholder_images(self, images: list, topic: str) -> list:
+        """Replace placeholder image URLs with actual image URLs from ImageService."""
+        if not images:
+            return images
+        
+        # Import ImageService
+        from .image_service import ImageService
+        image_service = ImageService()
+        
+        updated_images = []
+        for i, image in enumerate(images):
+            if hasattr(image, 'url') and image.url:
+                # Check if this is a placeholder URL
+                if any(placeholder in image.url for placeholder in ['section_specific_image_', 'item_', '_image']):
+                    try:
+                        # Generate section-specific title from image alt text or use generic
+                        section_title = image.alt if hasattr(image, 'alt') and image.alt else f"섹션 {i+1}"
+                        
+                        # Get actual images for this section
+                        real_images = await image_service.get_section_specific_images(
+                            section_title, topic, count=1
+                        )
+                        
+                        if real_images:
+                            # Replace placeholder with real image URL
+                            real_image = real_images[0]
+                            from .models import ImageInfo
+                            updated_image = ImageInfo(
+                                url=real_image.get('url', image.url),
+                                alt=real_image.get('alt', image.alt if hasattr(image, 'alt') else ''),
+                                caption=real_image.get('caption', image.caption if hasattr(image, 'caption') else '')
+                            )
+                            updated_images.append(updated_image)
+                        else:
+                            # Keep original if image generation fails
+                            updated_images.append(image)
+                    except Exception as e:
+                        print(f"Failed to replace placeholder image {i}: {e}")
+                        # Keep original image if replacement fails
+                        updated_images.append(image)
+                else:
+                    # Not a placeholder, keep as is
+                    updated_images.append(image)
+            else:
+                # No URL or invalid image, keep as is
+                updated_images.append(image)
+        
+        return updated_images
+
+    def _add_specific_site_links(self, html_content: str, topic: str) -> str:
+        """Add links to specific known sites when they are mentioned in content."""
+        import re
+        
+        # Define specific sites with their official URLs for different categories
+        site_mapping = {
+            # Travel booking sites
+            'booking.com': 'https://www.booking.com',
+            'booking': 'https://www.booking.com',
+            '부킹닷컴': 'https://www.booking.com',
+            'agoda': 'https://www.agoda.com',
+            '아고다': 'https://www.agoda.com',
+            'expedia': 'https://www.expedia.com',
+            '익스피디아': 'https://www.expedia.com',
+            'hotels.com': 'https://www.hotels.com',
+            'airbnb': 'https://www.airbnb.com',
+            '에어비앤비': 'https://www.airbnb.com',
+            
+            # Airlines - Korean
+            '대한항공': 'https://www.koreanair.com',
+            '아시아나': 'https://www.flyasiana.com',
+            '제주항공': 'https://www.jejuair.net',
+            '진에어': 'https://www.jinair.com',
+            
+            # Tour booking
+            'klook': 'https://www.klook.com',
+            '클룩': 'https://www.klook.com',
+            'viator': 'https://www.viator.com',
+            'getyourguide': 'https://www.getyourguide.com',
+            
+            # Transportation
+            'uber': 'https://www.uber.com',
+            '우버': 'https://www.uber.com',
+            'lyft': 'https://www.lyft.com',
+            'grab': 'https://www.grab.com',
+            
+            # Flight search
+            'skyscanner': 'https://www.skyscanner.com',
+            '스카이스캐너': 'https://www.skyscanner.com',
+            'kayak': 'https://www.kayak.com',
+            
+            # Grand Canyon specific (for this topic)
+            'grand canyon national park': 'https://www.nps.gov/grca',
+            '그랜드캐년 국립공원': 'https://www.nps.gov/grca',
+            'papillion': 'https://www.papillon.com',
+            'maverick helicopters': 'https://www.maverickhelicopter.com',
+            
+            # Las Vegas specific
+            'las vegas': 'https://www.visitlasvegas.com',
+            '라스베가스': 'https://www.visitlasvegas.com',
+            'mccarran airport': 'https://www.harryreidairport.com',
+            'harry reid airport': 'https://www.harryreidairport.com',
+            
+            # Car rental
+            'hertz': 'https://www.hertz.com',
+            'avis': 'https://www.avis.com',
+            'enterprise': 'https://www.enterprise.com',
+            'budget': 'https://www.budget.com',
+        }
+        
+        # Apply site links - add them in parentheses format
+        for site_name, url in site_mapping.items():
+            # Create pattern to match the site name (case insensitive)
+            pattern = re.compile(rf'\b{re.escape(site_name)}\b', re.IGNORECASE)
+            
+            # Only add link if the site is mentioned but not already linked
+            if pattern.search(html_content) and url not in html_content:
+                # Replace first occurrence with linked version in parentheses format
+                replacement = f'{site_name}({url})'
+                html_content = pattern.sub(replacement, html_content, count=1)
+        
+        print(f"DEBUG: Added specific site links for topic: {topic}")
+        return html_content
+
+    def _move_title_links_to_paragraphs(self, html_content: str) -> str:
+        """Move links from titles (h1, h2, h3) to the end of following paragraphs."""
+        import re
+        
+        def move_link_to_paragraph(match):
+            # Extract the title content and link
+            tag_start = match.group(1)  # <h1...>
+            title_content = match.group(2)  # title content
+            tag_end = match.group(3)  # </h1>
+            
+            # Check if title contains a link
+            link_pattern = r'\((https://[^)]+)\)'
+            link_match = re.search(link_pattern, title_content)
+            
+            if link_match:
+                # Remove link from title
+                clean_title = re.sub(link_pattern, '', title_content).strip()
+                extracted_link = link_match.group(1)
+                
+                # Reconstruct clean title
+                clean_header = f"{tag_start}{clean_title}{tag_end}"
+                
+                # Find the next paragraph after this header
+                remaining_content = html_content[match.end():]
+                para_pattern = r'(<p[^>]*>.*?</p>)'
+                para_match = re.search(para_pattern, remaining_content, re.DOTALL)
+                
+                if para_match:
+                    # Add link to end of first paragraph
+                    original_para = para_match.group(1)
+                    # Insert link before closing </p> tag
+                    modified_para = re.sub(r'</p>$', f' ({extracted_link})</p>', original_para)
+                    
+                    # Replace in content
+                    before_header = html_content[:match.start()]
+                    before_para = html_content[match.end():match.end() + para_match.start()]
+                    after_para = html_content[match.end() + para_match.end():]
+                    
+                    return before_header + clean_header + before_para + modified_para + after_para
+                else:
+                    # No paragraph found, keep clean header
+                    return html_content[:match.start()] + clean_header + html_content[match.end():]
+            else:
+                # No link in title, return as is
+                return match.group(0)
+        
+        # Pattern to match headers with potential links
+        header_pattern = r'(<h[1-3][^>]*>)(.*?)(</h[1-3]>)'
+        
+        # Check if any headers contain links
+        if re.search(r'<h[1-3][^>]*>.*?\(https://[^)]+\).*?</h[1-3]>', html_content):
+            # Process each header
+            result = html_content
+            for match in re.finditer(header_pattern, html_content, re.DOTALL):
+                result = move_link_to_paragraph(match)
+                if result != html_content:
+                    print(f"DEBUG: Moved link from title to paragraph")
+                    break  # Process one at a time to avoid overlap issues
+            return result
+        
+        return html_content
+
     def _final_google_link_cleanup(self, html_content: str) -> str:
         """Final pass to remove any remaining Google search links and ALL problematic links."""
         import re
         
         # ULTRA AGGRESSIVE LINK REMOVAL - Remove ALL links completely
         
-        # Step 1: Remove ALL <a> tags with any content
+        # Step 1: Remove ALL <a> tags with any content - more thorough patterns
         html_content = re.sub(r'<a[^>]*>.*?</a>', '', html_content, flags=re.IGNORECASE | re.DOTALL)
+        html_content = re.sub(r'<a\s[^>]*href[^>]*>.*?</a>', '', html_content, flags=re.IGNORECASE | re.DOTALL)
         
-        # Step 2: Remove any remaining href attributes
+        # Step 2: Remove any remaining href attributes anywhere
         html_content = re.sub(r'href\s*=\s*["\'][^"\']*["\']', '', html_content, flags=re.IGNORECASE)
         
-        # Step 3: Remove empty divs and spans left from link removal
+        # Step 3: Remove link-related text patterns that might remain
+        html_content = re.sub(r'자세히\s*보기', '', html_content, flags=re.IGNORECASE)
+        html_content = re.sub(r'바로\s*가기', '', html_content, flags=re.IGNORECASE)
+        html_content = re.sub(r'더\s*보기', '', html_content, flags=re.IGNORECASE)
+        html_content = re.sub(r'상세\s*보기', '', html_content, flags=re.IGNORECASE)
+        
+        # Step 4: Remove empty elements left from link removal
         html_content = re.sub(r'<div[^>]*>\s*</div>', '', html_content, flags=re.IGNORECASE)
         html_content = re.sub(r'<span[^>]*>\s*</span>', '', html_content, flags=re.IGNORECASE)
-        
-        # Step 4: Remove any standalone URLs that might be left
+        html_content = re.sub(r'<p[^>]*>\s*</p>', '', html_content, flags=re.IGNORECASE)
+
+        # Step 5: Remove any standalone URLs
         html_content = re.sub(r'https?://[^\s<>"]*google[^\s<>"]*', '', html_content, flags=re.IGNORECASE)
         html_content = re.sub(r'https?://[^\s<>"]*search[^\s<>"]*', '', html_content, flags=re.IGNORECASE)
-        
-        # Step 5: Clean up multiple spaces and line breaks left from removals
+        html_content = re.sub(r'https?://[^\s<>"]*\?q=[^\s<>"]*', '', html_content, flags=re.IGNORECASE)
+
+        # Step 6: Clean up multiple spaces and line breaks left from removals
         html_content = re.sub(r'\s+', ' ', html_content)
         html_content = re.sub(r'>\s+<', '><', html_content)
+        html_content = re.sub(r'<([^>]+)>\s*<(/[^>]+)>', r'<\1><\2>', html_content)
         
         print(f"DEBUG: Removed ALL links completely, remaining content length: {len(html_content)}")
         
@@ -1002,13 +2072,18 @@ class ContentGenerator:
                     display_text += f" ({source})"
                 
                 news_link_html = f'''
-<div style="margin: 20px 0 15px 0; padding: 12px; background: #f8f9fa; border-left: 4px solid #3498db; border-radius: 4px;">
-    <p style="color: #000000; margin: 0 0 8px 0; font-weight: 600; font-size: 14px;">📰 관련 정보</p>
-    <a href="{url}" target="_blank" rel="noopener noreferrer" 
-       style="color: #3498db; text-decoration: none; font-weight: 500; font-size: 14px; 
-              border: 1px solid #3498db; padding: 6px 12px; border-radius: 4px; 
-              display: inline-block; background: transparent; transition: all 0.3s ease;">
-        {display_text}
+<div style="text-align: center; margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.12);">
+    <p style="color: #2c3e50; margin: 0 0 15px 0; font-weight: 700; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">📰 관련 정보</p>
+    <a href="{url}" target="_blank" 
+       style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); 
+              color: white; text-decoration: none; font-weight: 700; font-size: 15px; 
+              padding: 15px 30px; border-radius: 50px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); 
+              transform: translateY(0); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+              text-transform: uppercase; letter-spacing: 1px; position: relative; overflow: hidden;">
+        <span style="position: relative; z-index: 1;">{display_text}</span>
+        <div style="position: absolute; top: 0; left: -100%; width: 100%; height: 100%; 
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); 
+                    transition: all 0.5s;"></div>
     </a>
 </div>'''
                 sections_with_links += 1
@@ -1136,7 +2211,7 @@ class ContentGenerator:
             place_pattern = rf'\b{re.escape(place_name)}\b(?![^<]*</a>)'
             
             def add_link(match):
-                return f'<a href="{place_url}" target="_blank" rel="noopener noreferrer" style="color: #3498db; text-decoration: none; font-weight: 500;">{match.group(0)}</a>'
+                return f'<a href="{place_url}" target="_blank" style="color: #3498db; text-decoration: none; font-weight: 500;">{match.group(0)}</a>'
             
             # Replace first occurrence only to avoid over-linking
             enhanced_content = re.sub(place_pattern, add_link, enhanced_content, count=1, flags=re.IGNORECASE)
@@ -1204,6 +2279,82 @@ class ContentGenerator:
             print(f"DEBUG: AI link generation failed: {e}")
             # Fallback to original method if AI fails
             return self._add_section_links(html_content, topic)
+    
+    def _calculate_word_count(self, html_content: str) -> int:
+        """Calculate word count from HTML content, excluding HTML tags."""
+        import re
+        # Remove HTML tags
+        text_only = re.sub(r'<[^>]+>', ' ', html_content)
+        # Remove extra whitespace and count words
+        words = text_only.split()
+        return len(words)
+    
+    def _balance_word_counts(self, contents: List[str], target_total: int, num_options: int) -> List[str]:
+        """Balance word counts across multiple content options."""
+        if num_options <= 1:
+            return contents
+            
+        # Calculate target word count per option
+        base_count_per_option = target_total // num_options
+        remainder = target_total % num_options
+        
+        # Create target counts for each option
+        target_counts = []
+        for i in range(num_options):
+            target = base_count_per_option
+            if i < remainder:  # Distribute remainder across first few options
+                target += 1
+            target_counts.append(target)
+        
+        print(f"DEBUG: Balancing {num_options} options with target counts: {target_counts}")
+        
+        balanced_contents = []
+        for i, content in enumerate(contents):
+            if i >= len(target_counts):
+                break
+                
+            current_count = self._calculate_word_count(content)
+            target_count = target_counts[i]
+            
+            print(f"DEBUG: Option {i+1}: Current={current_count}, Target={target_count}")
+            
+            # Adjust content length if needed
+            if current_count < target_count * 0.9:  # If significantly under target
+                adjusted_content = self._expand_content(content, target_count)
+            elif current_count > target_count * 1.1:  # If significantly over target
+                adjusted_content = self._trim_content(content, target_count)
+            else:
+                adjusted_content = content
+            
+            balanced_contents.append(adjusted_content)
+        
+        return balanced_contents
+    
+    def _expand_content(self, content: str, target_count: int) -> str:
+        """Expand content to reach target word count."""
+        # For now, return original content
+        # This could be enhanced to add more detailed sections
+        return content
+    
+    def _trim_content(self, content: str, target_count: int) -> str:
+        """Trim content to reach target word count."""
+        import re
+        
+        # Split content into sentences while preserving HTML structure
+        sentences = re.split(r'([.!?](?:\s*</[^>]*>)*\s*)', content)
+        
+        current_count = self._calculate_word_count(content)
+        if current_count <= target_count:
+            return content
+        
+        # Remove sentences from the end until we reach target count
+        while len(sentences) > 2 and self._calculate_word_count(''.join(sentences)) > target_count * 1.1:
+            # Remove from end, keeping pairs (sentence + punctuation)
+            if len(sentences) >= 2:
+                sentences.pop()
+                sentences.pop()
+        
+        return ''.join(sentences)
     
     def _create_link_generation_prompt(self, topic: str, headings: list) -> str:
         """Create prompt for AI to generate relevant links."""
@@ -1373,20 +2524,28 @@ class ContentGenerator:
         
         print(f"DEBUG: Created heading-to-URL mapping: {heading_to_url}")
         
-        # Simplified link template with just section name + 바로가기
-        link_template = '''<div style="margin: 15px 0; text-align: left;">
-            <a href="{}" target="_blank" rel="noopener noreferrer" 
-               style="color: #3498db; 
+        # Premium centered link template with sophisticated styling
+        link_template = '''<div style="text-align: center; margin: 25px 0;">
+            <a href="{}" target="_blank" 
+               style="display: inline-block; 
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); 
+                      color: white; 
                       text-decoration: none; 
-                      font-weight: 600; 
-                      font-size: 14px;
-                      padding: 8px 12px; 
-                      border: 1px solid #3498db;
-                      border-radius: 6px; 
-                      display: inline-block;
-                      background: transparent;
-                      transition: all 0.2s ease;">
-                {}
+                      font-weight: 700; 
+                      font-size: 15px;
+                      padding: 15px 30px; 
+                      border-radius: 50px;
+                      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+                      transform: translateY(0);
+                      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                      text-transform: uppercase;
+                      letter-spacing: 1px;
+                      position: relative;
+                      overflow: hidden;">
+                <span style="position: relative; z-index: 1;">{}</span>
+                <div style="position: absolute; top: 0; left: -100%; width: 100%; height: 100%; 
+                            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); 
+                            transition: all 0.5s;"></div>
             </a>
         </div>'''
         

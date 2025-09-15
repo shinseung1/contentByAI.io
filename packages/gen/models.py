@@ -25,6 +25,8 @@ class GenerationRequest(BaseModel):
     word_count: Optional[int] = Field(800, ge=300, le=3000, description="Target word count")
     include_images: bool = Field(True, description="Whether to include images")
     target_language: str = Field("ko", max_length=10, description="Target language code")
+    num_options: Optional[int] = Field(1, ge=1, le=5, description="Number of content options to generate")
+    balance_word_count: bool = Field(True, description="Whether to balance word count across multiple options")
 
 
 class ImageInfo(dict):
@@ -65,6 +67,8 @@ class GeneratedContent(BaseModel):
     summary: Optional[str] = Field(None, description="Content summary")
     tags: List[str] = Field(default_factory=list, description="Content tags")
     images: List[Dict[str, Any]] = Field(default_factory=list, description="Related images")
+    options: Optional[List['GeneratedContent']] = Field(None, description="Multiple content options")
+    word_count_actual: Optional[int] = Field(None, description="Actual word count of the content")
     
     def __init__(self, **data):
         # Convert any ImageInfo objects to ensure they're JSON serializable
@@ -93,6 +97,8 @@ class GenerationResponse(BaseModel):
     error: Optional[str] = Field(None, description="Error message (if failed)")
     created_at: Optional[str] = Field(None, description="Creation timestamp")
     completed_at: Optional[str] = Field(None, description="Completion timestamp")
+    tone: Optional[str] = Field(None, description="Content tone")
+    word_count: Optional[int] = Field(None, description="Target word count")
 
 
 # Database Models
@@ -108,6 +114,8 @@ class GenerationJob(Base):
     word_count = Column(Integer, nullable=False, default=800)
     include_images = Column(String, nullable=False, default="1")  # SQLite boolean as string
     target_language = Column(String, nullable=False, default="ko")
+    num_options = Column(Integer, nullable=False, default=1)
+    balance_word_count = Column(String, nullable=False, default="1")  # SQLite boolean as string
     
     status = Column(String, nullable=False, default=GenerationStatus.PENDING)
     progress = Column(Integer, nullable=False, default=0)

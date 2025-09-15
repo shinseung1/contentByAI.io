@@ -92,9 +92,9 @@ class ImageService:
             # Use deterministic image ID based on topic and index for consistent caching
             image_id = (topic_seed + i) % 1000
             
-            # Use specific image IDs from Unsplash for consistent results
+            # Use placeholder images with reliable CDN
             images.append(create_image_info(
-                url=f"https://source.unsplash.com/800x450/?{search_term}&sig={image_id}",
+                url=f"https://picsum.photos/800/450?random={image_id}",
                 alt=f"{topic} 관련 이미지 {i+1} - {search_term}",
                 caption=f"{topic}에 대한 {search_term} 관련 이미지"
             ))
@@ -184,7 +184,7 @@ class ImageService:
             image_id = (seed + i) % 1000
             
             images.append(create_image_info(
-                url=f"https://source.unsplash.com/800x450/?{search_term}&sig={image_id}",
+                url=f"https://picsum.photos/800/450?random={image_id}",
                 alt=f"{section_title} - {search_term}",
                 caption=f"{section_title}와 관련된 {search_term} 이미지"
             ))

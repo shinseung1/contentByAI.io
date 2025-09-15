@@ -84,6 +84,20 @@ class ImageCache:
     last_accessed: Optional[str] = None
     access_count: int = 0
 
+@dataclass
+class Bundle:
+    id: Optional[int] = None
+    bundle_id: str = ""  # UUID
+    title: str = ""
+    description: Optional[str] = None
+    status: str = "draft"  # draft, published, archived
+    post_count: int = 0
+    total_views: int = 0
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    published_at: Optional[str] = None
+    metadata: Optional[str] = None  # JSON string for additional data
+
 class DatabaseManager:
     def __init__(self, db_path: str = DATABASE_PATH):
         self.db_path = db_path
@@ -94,6 +108,8 @@ class DatabaseManager:
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS test_results (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -217,6 +233,8 @@ class DatabaseManager:
     def save_test_result(self, result: TestResult) -> int:
         """테스트 결과 저장"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             cursor = conn.execute("""
                 INSERT INTO test_results 
                 (provider, prompt, response, success, error_message, token_usage, response_time_ms, created_at)
@@ -237,6 +255,8 @@ class DatabaseManager:
     def get_test_results(self, provider: Optional[str] = None, limit: int = 50) -> List[TestResult]:
         """테스트 결과 조회"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             
             if provider:
@@ -279,6 +299,8 @@ class DatabaseManager:
     def get_provider_stats(self, provider: str) -> Dict[str, Any]:
         """제공자별 통계 조회"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             cursor = conn.execute("""
                 SELECT 
                     COUNT(*) as total_tests,
@@ -316,6 +338,8 @@ class DatabaseManager:
     def save_generation_job(self, job: GenerationJob) -> int:
         """콘텐츠 생성 작업 저장"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             cursor = conn.execute("""
                 INSERT OR REPLACE INTO generation_jobs 
                 (job_id, provider, topic, tone, word_count, include_images, target_language, 
@@ -344,6 +368,8 @@ class DatabaseManager:
     def get_generation_job(self, job_id: str) -> Optional[GenerationJob]:
         """콘텐츠 생성 작업 조회"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("""
                 SELECT * FROM generation_jobs WHERE job_id = ?
@@ -374,6 +400,8 @@ class DatabaseManager:
     def get_generation_jobs(self, provider: Optional[str] = None, status: Optional[str] = None, limit: int = 50) -> List[GenerationJob]:
         """콘텐츠 생성 작업 목록 조회"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             
             query = "SELECT * FROM generation_jobs WHERE 1=1"
@@ -419,6 +447,8 @@ class DatabaseManager:
                                    content: Optional[str] = None, error_message: Optional[str] = None):
         """콘텐츠 생성 작업 상태 업데이트"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.execute("""
                 UPDATE generation_jobs 
                 SET status = ?, progress = ?, content = ?, error_message = ?, updated_at = ?
@@ -429,6 +459,8 @@ class DatabaseManager:
     def save_image_cache(self, image_cache: ImageCache) -> int:
         """이미지 캐시 저장"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             cursor = conn.execute("""
                 INSERT OR REPLACE INTO image_cache 
                 (url_hash, original_url, alt_text, caption, image_data, mime_type, 
@@ -454,6 +486,8 @@ class DatabaseManager:
     def get_image_cache(self, url_hash: str) -> Optional[ImageCache]:
         """이미지 캐시 조회 및 액세스 카운트 증가"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             
             # 캐시된 이미지 조회
@@ -491,6 +525,8 @@ class DatabaseManager:
     def cleanup_old_images(self, days_old: int = 30, max_size_mb: int = 100):
         """오래된 이미지 캐시 정리"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             from datetime import datetime, timedelta
             
             cutoff_date = (datetime.now() - timedelta(days=days_old)).isoformat()
@@ -534,6 +570,8 @@ class DatabaseManager:
         password_hash_string = salt + ":" + password_hash.hex()
         
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             cursor = conn.execute("""
                 INSERT INTO users (username, password_hash, email, role, expires_at, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -598,6 +636,8 @@ class DatabaseManager:
     def get_user_by_username(self, username: str) -> Optional[User]:
         """사용자명으로 사용자 조회"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("""
                 SELECT * FROM users WHERE username = ?
@@ -624,6 +664,8 @@ class DatabaseManager:
     def update_user_login_success(self, user_id: int):
         """로그인 성공 시 정보 업데이트"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.execute("""
                 UPDATE users 
                 SET last_login = ?, login_attempts = 0, locked_until = NULL, updated_at = ?
@@ -636,6 +678,8 @@ class DatabaseManager:
         from datetime import timedelta
         
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             # 현재 실패 횟수 조회
             cursor = conn.execute("SELECT login_attempts FROM users WHERE id = ?", (user_id,))
             row = cursor.fetchone()
@@ -663,6 +707,8 @@ class DatabaseManager:
         expires_at = (datetime.now() + timedelta(hours=24)).isoformat()
         
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.execute("""
                 INSERT INTO login_sessions (user_id, session_token, expires_at, ip_address, user_agent)
                 VALUES (?, ?, ?, ?, ?)
@@ -674,6 +720,8 @@ class DatabaseManager:
     def validate_session(self, session_token: str) -> Optional[User]:
         """세션 토큰 검증"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("""
                 SELECT u.*, s.expires_at as session_expires
@@ -703,12 +751,16 @@ class DatabaseManager:
     def delete_session(self, session_token: str):
         """세션 삭제 (로그아웃)"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.execute("DELETE FROM login_sessions WHERE session_token = ?", (session_token,))
             conn.commit()
 
     def get_session_by_token(self, session_token: str):
         """토큰으로 세션 조회"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("""
                 SELECT u.username, s.expires_at
@@ -728,12 +780,153 @@ class DatabaseManager:
     def reset_failed_attempts(self, username: str):
         """로그인 실패 횟수 초기화"""
         with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str  # Ensure UTF-8 text handling
+            conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.execute("""
                 UPDATE users 
                 SET login_attempts = 0, locked_until = NULL, updated_at = ?
                 WHERE username = ?
             """, (datetime.now().isoformat(), username))
             conn.commit()
+
+    # Bundle management methods
+    def create_bundle(self, bundle_id: str, title: str, description: str = None, metadata: dict = None) -> int:
+        """번들 생성"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            # Create bundles table if not exists
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS bundles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    bundle_id TEXT UNIQUE NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    status TEXT NOT NULL DEFAULT 'draft',
+                    post_count INTEGER NOT NULL DEFAULT 0,
+                    total_views INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    published_at TEXT,
+                    metadata TEXT
+                )
+            """)
+            
+            cursor = conn.execute("\"\"
+                INSERT INTO bundles (bundle_id, title, description, metadata, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                bundle_id,
+                title,
+                description,
+                json.dumps(metadata) if metadata else None,
+                datetime.now().isoformat(),
+                datetime.now().isoformat()
+            ))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_bundle(self, bundle_id: str) -> Optional[Bundle]:
+        """번들 조회"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            conn.row_factory = sqlite3.Row
+            
+            cursor = conn.execute("SELECT * FROM bundles WHERE bundle_id = ?", (bundle_id,))
+            row = cursor.fetchone()
+            
+            if row:
+                return Bundle(
+                    id=row['id'],
+                    bundle_id=row['bundle_id'],
+                    title=row['title'],
+                    description=row['description'],
+                    status=row['status'],
+                    post_count=row['post_count'],
+                    total_views=row['total_views'],
+                    created_at=row['created_at'],
+                    updated_at=row['updated_at'],
+                    published_at=row['published_at'],
+                    metadata=row['metadata']
+                )
+            return None
+
+    def list_bundles(self, limit: int = 50, offset: int = 0) -> List[Bundle]:
+        """번들 목록 조회"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            conn.row_factory = sqlite3.Row
+            
+            cursor = conn.execute("\"\"
+                SELECT * FROM bundles 
+                ORDER BY created_at DESC 
+                LIMIT ? OFFSET ?
+            """, (limit, offset))
+            
+            bundles = []
+            for row in cursor.fetchall():
+                bundles.append(Bundle(
+                    id=row['id'],
+                    bundle_id=row['bundle_id'],
+                    title=row['title'],
+                    description=row['description'],
+                    status=row['status'],
+                    post_count=row['post_count'],
+                    total_views=row['total_views'],
+                    created_at=row['created_at'],
+                    updated_at=row['updated_at'],
+                    published_at=row['published_at'],
+                    metadata=row['metadata']
+                ))
+            return bundles
+
+    def update_bundle(self, bundle_id: str, title: str = None, description: str = None, 
+                     status: str = None, metadata: dict = None) -> bool:
+        """번들 업데이트"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            updates = []
+            params = []
+            
+            if title is not None:
+                updates.append("title = ?")
+                params.append(title)
+            if description is not None:
+                updates.append("description = ?")
+                params.append(description)
+            if status is not None:
+                updates.append("status = ?")
+                params.append(status)
+            if metadata is not None:
+                updates.append("metadata = ?")
+                params.append(json.dumps(metadata))
+            
+            if updates:
+                updates.append("updated_at = ?")
+                params.append(datetime.now().isoformat())
+                params.append(bundle_id)
+                
+                query = f\"UPDATE bundles SET {', '.join(updates)} WHERE bundle_id = ?\"
+                cursor = conn.execute(query, params)
+                conn.commit()
+                return cursor.rowcount > 0
+            return False
+
+    def delete_bundle(self, bundle_id: str) -> bool:
+        """번들 삭제"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            cursor = conn.execute("DELETE FROM bundles WHERE bundle_id = ?", (bundle_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
 
 # 전역 데이터베이스 인스턴스
 db = DatabaseManager()

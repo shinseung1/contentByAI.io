@@ -53,8 +53,11 @@ class OpenAIClient(BaseAIClient):
             # Use safe printing to avoid Unicode encoding errors on Windows
             try:
                 import sys
-                print(f"OpenAI API Error: {e}", file=sys.stderr)
-                # Don't print request details with potentially problematic Unicode
+                error_msg = str(e)
+                # Remove emojis and problematic Unicode characters
+                import re
+                error_msg = re.sub(r'[\U0001f300-\U0001f9ff]', '?', error_msg)
+                print(f"OpenAI API Error: {error_msg}", file=sys.stderr)
             except UnicodeEncodeError:
                 print("OpenAI API Error occurred (with Unicode characters)", file=sys.stderr)
             raise

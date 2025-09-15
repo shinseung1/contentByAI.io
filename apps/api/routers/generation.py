@@ -20,6 +20,8 @@ class GenerateContentRequest(BaseModel):
     word_count: Optional[int] = Field(800, ge=300, le=3000)
     include_images: bool = Field(True)
     target_language: str = Field("ko", max_length=10)
+    num_options: Optional[int] = Field(1, ge=1, le=5, description="Number of content options to generate")
+    balance_word_count: bool = Field(True, description="Whether to balance word count across multiple options")
 
 
 class GenerationJobResponse(BaseModel):
@@ -43,7 +45,9 @@ async def generate_content(
         tone=request.tone,
         word_count=request.word_count,
         include_images=request.include_images,
-        target_language=request.target_language
+        target_language=request.target_language,
+        num_options=request.num_options,
+        balance_word_count=request.balance_word_count
     )
     
     job_id = generator.create_job_id()
@@ -107,9 +111,15 @@ async def get_generation_job(job_id: str):
             },
             "error": response.error,
             "created_at": response.created_at,
-            "completed_at": response.completed_at
+            "completed_at": response.completed_at,
+            "tone": response.tone,
+            "word_count": response.word_count
         }
         
+        print(f"DEBUG API: response.tone = {response.tone}")
+        print(f"DEBUG API: response.word_count = {response.word_count}")
+        print(f"DEBUG API: response_dict tone = {response_dict['tone']}")
+        print(f"DEBUG API: response_dict word_count = {response_dict['word_count']}")
         print(f"DEBUG API: Returning response dict")
         return response_dict
     except FileNotFoundError:
@@ -131,6 +141,7 @@ async def list_generation_jobs() -> List[GenerationResponse]:
     for job_id in job_ids:
         try:
             job_data = generator.get_job_result(job_id)
+            print(f"DEBUG LIST: Job {job_id} - tone: {job_data.tone}, word_count: {job_data.word_count}")
             jobs.append(job_data)
         except FileNotFoundError:
             continue

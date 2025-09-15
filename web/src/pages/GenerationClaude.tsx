@@ -20,6 +20,12 @@ const GenerationClaude: React.FC = () => {
     setHistoryLoading(true)
     try {
       const jobs = await api.listGenerationJobs('claude')
+      console.log('Loaded jobs for Claude:', jobs)
+      jobs.forEach((job, index) => {
+        if (index < 3) {
+          console.log(`History Job ${index}: tone=${job.tone}, word_count=${job.word_count}`)
+        }
+      })
       setHistoryJobs(jobs)
     } catch (error) {
       console.error('Failed to load history:', error)
@@ -480,12 +486,12 @@ const GenerationClaude: React.FC = () => {
                       <Space>
                         <ClockCircleOutlined />
                         <Text type="secondary">
-                          {new Date(job.createdAt).toLocaleString('ko-KR')}
+                          {job.created_at ? new Date(job.created_at).toLocaleString('ko-KR') : '날짜 없음'}
                         </Text>
                         <Divider type="vertical" />
-                        <Text type="secondary">톤: {job.tone}</Text>
+                        <Text type="secondary">톤: {job.tone || '미설정'}</Text>
                         <Divider type="vertical" />
-                        <Text type="secondary">목표: {job.wordCount}자</Text>
+                        <Text type="secondary">목표: {job.word_count || job.wordCount || '미설정'}자</Text>
                       </Space>
                       {job.content && (
                         <div>

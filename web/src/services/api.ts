@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://127.0.0.1:3000/api/v1'
+const API_BASE_URL = 'http://127.0.0.1:8000/api/v1'
 
 export interface GenerationRequest {
   topic: string
@@ -37,6 +37,8 @@ export interface GenerationResponse {
   error?: string
   created_at: string
   completed_at?: string
+  tone?: string
+  word_count?: number
 }
 
 export const api = {
@@ -95,6 +97,12 @@ export const api = {
 
     const jobs: GenerationResponse[] = await response.json()
     console.log('API response for listGenerationJobs:', jobs)
+    console.log('First job tone:', jobs[0]?.tone, 'word_count:', jobs[0]?.word_count)
+    jobs.forEach((job, index) => {
+      if (index < 3) {
+        console.log(`Job ${index}: tone=${job.tone}, word_count=${job.word_count}, job_id=${job.job_id}`)
+      }
+    })
     
     // Filter by provider if specified
     if (provider) {

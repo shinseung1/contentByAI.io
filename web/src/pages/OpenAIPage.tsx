@@ -498,12 +498,12 @@ const OpenAIPage: React.FC = () => {
                       <Space>
                         <ClockCircleOutlined />
                         <Text type="secondary">
-                          {new Date(job.createdAt).toLocaleString('ko-KR')}
+                          {job.created_at ? new Date(job.created_at).toLocaleString('ko-KR') : '날짜 없음'}
                         </Text>
                         <Divider type="vertical" />
-                        <Text type="secondary">톤: {job.tone}</Text>
+                        <Text type="secondary">톤: {job.tone || '미설정'}</Text>
                         <Divider type="vertical" />
-                        <Text type="secondary">목표: {job.wordCount}자</Text>
+                        <Text type="secondary">목표: {job.word_count || job.wordCount || '미설정'}자</Text>
                       </Space>
                       {job.content && (
                         <div>
