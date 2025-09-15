@@ -911,7 +911,7 @@ class DatabaseManager:
                 params.append(datetime.now().isoformat())
                 params.append(bundle_id)
                 
-                query = f\"UPDATE bundles SET {', '.join(updates)} WHERE bundle_id = ?\"
+                query = f"UPDATE bundles SET {', '.join(updates)} WHERE bundle_id = ?\"
                 cursor = conn.execute(query, params)
                 conn.commit()
                 return cursor.rowcount > 0
