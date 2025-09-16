@@ -1,23 +1,40 @@
-import React from 'react'
-import { Row, Col, Card, Statistic, List, Badge, Typography, Space, Alert } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Row, Col, Card, Statistic, List, Badge, Typography, Space, Alert, Spin } from 'antd'
 import { TrophyOutlined, ClockCircleOutlined, DollarOutlined, ScheduleOutlined, ExclamationCircleOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
+import { api, DashboardStats, DashboardActivity, DashboardAlert } from '../../services/api'
 
 const { Title, Text } = Typography
 
 const AdminDashboard: React.FC = () => {
-  const recentActivities = [
-    { id: 1, action: '콘텐츠 생성 완료', user: 'user1', model: 'GPT-4', status: 'success', timestamp: '2분 전' },
-    { id: 2, action: '사용자 계정 생성', user: 'admin', target: 'newuser@company.com', status: 'success', timestamp: '15분 전' },
-    { id: 3, action: 'API 키 갱신', user: 'admin', provider: 'OpenAI', status: 'warning', timestamp: '1시간 전' },
-    { id: 4, action: '워크플로우 배포', user: 'editor1', workflow: 'SEO 최적화', status: 'success', timestamp: '2시간 전' },
-    { id: 5, action: '토큰 한도 초과', user: 'user2', model: 'Claude', status: 'error', timestamp: '3시간 전' },
-  ]
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [activities, setActivities] = useState<DashboardActivity[]>([])
+  const [alerts, setAlerts] = useState<DashboardAlert[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const alerts = [
-    { type: 'warning', message: 'OpenAI API 키가 7일 후 만료됩니다', action: '키 갱신' },
-    { type: 'info', message: '3명의 사용자가 토큰 한도 80%에 도달했습니다', action: '한도 조정' },
-    { type: 'error', message: 'WordPress 연동에서 2건의 발행 실패가 발생했습니다', action: '연동 확인' },
-  ]
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        setLoading(true)
+        const [statsData, activitiesData, alertsData] = await Promise.all([
+          api.getDashboardStats(),
+          api.getDashboardActivities(5),
+          api.getDashboardAlerts()
+        ])
+        setStats(statsData)
+        setActivities(activitiesData)
+        setAlerts(alertsData)
+        setError(null)
+      } catch (err) {
+        console.error('Failed to load dashboard data:', err)
+        setError(err instanceof Error ? err.message : '데이터를 불러오는데 실패했습니다')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadDashboardData()
+  }, [])
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -26,6 +43,26 @@ const AdminDashboard: React.FC = () => {
       case 'error': return <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
       default: return <ClockCircleOutlined style={{ color: '#1890ff' }} />
     }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '50px' }}>
+        <Spin size="large" />
+        <p style={{ marginTop: 16 }}>대시보드 데이터를 불러오는 중...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <Alert
+        message="데이터 로드 실패"
+        description={error}
+        type="error"
+        showIcon
+      />
+    )
   }
 
   return (
@@ -38,7 +75,7 @@ const AdminDashboard: React.FC = () => {
           <Card>
             <Statistic
               title="오늘 생성 건수"
-              value={127}
+              value={stats?.today_jobs || 0}
               prefix={<TrophyOutlined />}
               valueStyle={{ color: '#3f8600' }}
               suffix="건"
@@ -49,7 +86,7 @@ const AdminDashboard: React.FC = () => {
           <Card>
             <Statistic
               title="실패/재시도"
-              value={8}
+              value={stats?.failed_jobs || 0}
               prefix={<ClockCircleOutlined />}
               valueStyle={{ color: '#cf1322' }}
               suffix="건"
@@ -60,7 +97,8 @@ const AdminDashboard: React.FC = () => {
           <Card>
             <Statistic
               title="토큰/비용"
-              value={2847.50}
+              value={stats?.estimated_cost || 0}
+              precision={2}
               prefix={<DollarOutlined />}
               valueStyle={{ color: '#722ed1' }}
               suffix="USD"
@@ -70,8 +108,8 @@ const AdminDashboard: React.FC = () => {
         <Col span={6}>
           <Card>
             <Statistic
-              title="예약 발행 대기"
-              value={15}
+              title="진행 중 작업"
+              value={stats?.in_progress_jobs || 0}
               prefix={<ScheduleOutlined />}
               valueStyle={{ color: '#1890ff' }}
               suffix="건"
@@ -85,7 +123,7 @@ const AdminDashboard: React.FC = () => {
           <Card title="최근 활동" extra={<a href="#">전체 로그 보기</a>}>
             <List
               itemLayout="horizontal"
-              dataSource={recentActivities}
+              dataSource={activities}
               renderItem={(item) => (
                 <List.Item>
                   <List.Item.Meta
@@ -121,7 +159,14 @@ const AdminDashboard: React.FC = () => {
                 <Alert
                   key={index}
                   message={alert.message}
-                  type={alert.type as any}
+                  description={alert.details && alert.details.length > 0 ? (
+                    <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                      {alert.details.map((detail, idx) => (
+                        <li key={idx} style={{ fontSize: '12px' }}>{detail}</li>
+                      ))}
+                    </ul>
+                  ) : undefined}
+                  type={alert.type}
                   action={
                     <a href="#" style={{ fontSize: '12px' }}>
                       {alert.action}
@@ -129,6 +174,7 @@ const AdminDashboard: React.FC = () => {
                   }
                   closable
                   showIcon
+                  style={{ marginBottom: '8px' }}
                 />
               ))}
             </Space>

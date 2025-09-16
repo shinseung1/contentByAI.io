@@ -108,7 +108,7 @@ class DatabaseManager:
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS test_results (
@@ -233,7 +233,7 @@ class DatabaseManager:
     def save_test_result(self, result: TestResult) -> int:
         """테스트 결과 저장"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             cursor = conn.execute("""
                 INSERT INTO test_results 
@@ -255,7 +255,7 @@ class DatabaseManager:
     def get_test_results(self, provider: Optional[str] = None, limit: int = 50) -> List[TestResult]:
         """테스트 결과 조회"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             
@@ -299,7 +299,7 @@ class DatabaseManager:
     def get_provider_stats(self, provider: str) -> Dict[str, Any]:
         """제공자별 통계 조회"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             cursor = conn.execute("""
                 SELECT 
@@ -338,7 +338,7 @@ class DatabaseManager:
     def save_generation_job(self, job: GenerationJob) -> int:
         """콘텐츠 생성 작업 저장"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             cursor = conn.execute("""
                 INSERT OR REPLACE INTO generation_jobs 
@@ -368,7 +368,7 @@ class DatabaseManager:
     def get_generation_job(self, job_id: str) -> Optional[GenerationJob]:
         """콘텐츠 생성 작업 조회"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("""
@@ -400,7 +400,7 @@ class DatabaseManager:
     def get_generation_jobs(self, provider: Optional[str] = None, status: Optional[str] = None, limit: int = 50) -> List[GenerationJob]:
         """콘텐츠 생성 작업 목록 조회"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             
@@ -447,7 +447,7 @@ class DatabaseManager:
                                    content: Optional[str] = None, error_message: Optional[str] = None):
         """콘텐츠 생성 작업 상태 업데이트"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.execute("""
                 UPDATE generation_jobs 
@@ -459,7 +459,7 @@ class DatabaseManager:
     def save_image_cache(self, image_cache: ImageCache) -> int:
         """이미지 캐시 저장"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             cursor = conn.execute("""
                 INSERT OR REPLACE INTO image_cache 
@@ -486,7 +486,7 @@ class DatabaseManager:
     def get_image_cache(self, url_hash: str) -> Optional[ImageCache]:
         """이미지 캐시 조회 및 액세스 카운트 증가"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             
@@ -525,7 +525,7 @@ class DatabaseManager:
     def cleanup_old_images(self, days_old: int = 30, max_size_mb: int = 100):
         """오래된 이미지 캐시 정리"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             from datetime import datetime, timedelta
             
@@ -570,7 +570,7 @@ class DatabaseManager:
         password_hash_string = salt + ":" + password_hash.hex()
         
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             cursor = conn.execute("""
                 INSERT INTO users (username, password_hash, email, role, expires_at, created_at, updated_at)
@@ -636,7 +636,7 @@ class DatabaseManager:
     def get_user_by_username(self, username: str) -> Optional[User]:
         """사용자명으로 사용자 조회"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("""
@@ -664,7 +664,7 @@ class DatabaseManager:
     def update_user_login_success(self, user_id: int):
         """로그인 성공 시 정보 업데이트"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.execute("""
                 UPDATE users 
@@ -678,7 +678,7 @@ class DatabaseManager:
         from datetime import timedelta
         
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             # 현재 실패 횟수 조회
             cursor = conn.execute("SELECT login_attempts FROM users WHERE id = ?", (user_id,))
@@ -707,7 +707,7 @@ class DatabaseManager:
         expires_at = (datetime.now() + timedelta(hours=24)).isoformat()
         
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.execute("""
                 INSERT INTO login_sessions (user_id, session_token, expires_at, ip_address, user_agent)
@@ -720,7 +720,7 @@ class DatabaseManager:
     def validate_session(self, session_token: str) -> Optional[User]:
         """세션 토큰 검증"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("""
@@ -751,7 +751,7 @@ class DatabaseManager:
     def delete_session(self, session_token: str):
         """세션 삭제 (로그아웃)"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.execute("DELETE FROM login_sessions WHERE session_token = ?", (session_token,))
             conn.commit()
@@ -759,7 +759,7 @@ class DatabaseManager:
     def get_session_by_token(self, session_token: str):
         """토큰으로 세션 조회"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("""
@@ -780,7 +780,7 @@ class DatabaseManager:
     def reset_failed_attempts(self, username: str):
         """로그인 실패 횟수 초기화"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str  # Ensure UTF-8 text handling
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")  # Force UTF-8 encoding
             conn.execute("""
                 UPDATE users 
@@ -793,7 +793,7 @@ class DatabaseManager:
     def create_bundle(self, bundle_id: str, title: str, description: str = None, metadata: dict = None) -> int:
         """번들 생성"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")
             
             # Create bundles table if not exists
@@ -813,7 +813,7 @@ class DatabaseManager:
                 )
             """)
             
-            cursor = conn.execute("\"\"
+            cursor = conn.execute("""
                 INSERT INTO bundles (bundle_id, title, description, metadata, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (
@@ -830,7 +830,7 @@ class DatabaseManager:
     def get_bundle(self, bundle_id: str) -> Optional[Bundle]:
         """번들 조회"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")
             conn.row_factory = sqlite3.Row
             
@@ -856,11 +856,11 @@ class DatabaseManager:
     def list_bundles(self, limit: int = 50, offset: int = 0) -> List[Bundle]:
         """번들 목록 조회"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")
             conn.row_factory = sqlite3.Row
             
-            cursor = conn.execute("\"\"
+            cursor = conn.execute("""
                 SELECT * FROM bundles 
                 ORDER BY created_at DESC 
                 LIMIT ? OFFSET ?
@@ -887,7 +887,7 @@ class DatabaseManager:
                      status: str = None, metadata: dict = None) -> bool:
         """번들 업데이트"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")
             
             updates = []
@@ -911,7 +911,7 @@ class DatabaseManager:
                 params.append(datetime.now().isoformat())
                 params.append(bundle_id)
                 
-                query = f"UPDATE bundles SET {', '.join(updates)} WHERE bundle_id = ?\"
+                query = f"UPDATE bundles SET {', '.join(updates)} WHERE bundle_id = ?"
                 cursor = conn.execute(query, params)
                 conn.commit()
                 return cursor.rowcount > 0
@@ -920,12 +920,308 @@ class DatabaseManager:
     def delete_bundle(self, bundle_id: str) -> bool:
         """번들 삭제"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.text_factory = str
+            # SQLite default text handling is already Unicode in Python 3
             conn.execute("PRAGMA encoding = 'UTF-8'")
             
             cursor = conn.execute("DELETE FROM bundles WHERE bundle_id = ?", (bundle_id,))
             conn.commit()
             return cursor.rowcount > 0
+
+    def get_dashboard_stats(self) -> Dict[str, Any]:
+        """대시보드용 통계 데이터 조회"""
+        with sqlite3.connect(self.db_path) as conn:
+            # SQLite default text handling is already Unicode in Python 3
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            # 오늘 생성 건수
+            today = datetime.now().date().isoformat()
+            today_jobs = conn.execute("""
+                SELECT COUNT(*) FROM generation_jobs 
+                WHERE DATE(created_at) = ?
+            """, (today,)).fetchone()[0]
+            
+            # 실패/재시도 건수 (오늘)
+            failed_jobs = conn.execute("""
+                SELECT COUNT(*) FROM generation_jobs 
+                WHERE DATE(created_at) = ? AND status = 'failed'
+            """, (today,)).fetchone()[0]
+            
+            # 진행중인 작업 수
+            in_progress_jobs = conn.execute("""
+                SELECT COUNT(*) FROM generation_jobs 
+                WHERE status = 'in_progress'
+            """, ).fetchone()[0]
+            
+            # 전체 완료된 작업 수
+            completed_jobs = conn.execute("""
+                SELECT COUNT(*) FROM generation_jobs 
+                WHERE status = 'completed'
+            """, ).fetchone()[0]
+            
+            # 활성 사용자 수
+            active_users = conn.execute("""
+                SELECT COUNT(*) FROM users 
+                WHERE is_active = 1
+            """, ).fetchone()[0]
+            
+            # 프로바이더별 통계
+            provider_stats = {}
+            providers = ['gemini', 'claude', 'openai']
+            for provider in providers:
+                count = conn.execute("""
+                    SELECT COUNT(*) FROM generation_jobs 
+                    WHERE provider = ?
+                """, (provider,)).fetchone()[0]
+                provider_stats[provider] = count
+            
+            return {
+                'today_jobs': today_jobs,
+                'failed_jobs': failed_jobs,
+                'in_progress_jobs': in_progress_jobs,
+                'completed_jobs': completed_jobs,
+                'active_users': active_users,
+                'provider_stats': provider_stats,
+                'estimated_cost': self._calculate_estimated_cost()
+            }
+    
+    def get_recent_activities(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """최근 활동 조회"""
+        with sqlite3.connect(self.db_path) as conn:
+            # SQLite default text handling is already Unicode in Python 3
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            conn.row_factory = sqlite3.Row
+            
+            cursor = conn.execute("""
+                SELECT job_id, provider, topic, status, error_message, created_at, updated_at
+                FROM generation_jobs 
+                ORDER BY created_at DESC 
+                LIMIT ?
+            """, (limit,))
+            
+            activities = []
+            for row in cursor.fetchall():
+                action = "콘텐츠 생성 완료" if row['status'] == 'completed' else \
+                        "콘텐츠 생성 실패" if row['status'] == 'failed' else \
+                        "콘텐츠 생성 중"
+                
+                activities.append({
+                    'id': row['job_id'],
+                    'action': action,
+                    'user': 'system',  # 실제 사용자 정보가 있다면 조인해서 가져오기
+                    'model': row['provider'],
+                    'topic': row['topic'][:50] + '...' if len(row['topic']) > 50 else row['topic'],
+                    'status': 'success' if row['status'] == 'completed' else 
+                             'error' if row['status'] == 'failed' else 'warning',
+                    'timestamp': self._format_timestamp(row['created_at']),
+                    'error_message': row['error_message']
+                })
+            
+            return activities
+    
+    def _calculate_estimated_cost(self) -> float:
+        """예상 비용 계산 (대략적)"""
+        with sqlite3.connect(self.db_path) as conn:
+            # SQLite default text handling is already Unicode in Python 3
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            # 간단한 예상 비용 계산 (완료된 작업 수 * 평균 비용)
+            completed_count = conn.execute("""
+                SELECT COUNT(*) FROM generation_jobs 
+                WHERE status = 'completed'
+            """).fetchone()[0]
+            
+            # 대략적인 평균 비용 (실제로는 토큰 사용량 기반으로 계산해야 함)
+            avg_cost_per_job = 0.05  # $0.05 per job
+            
+            return completed_count * avg_cost_per_job
+    
+    def _format_timestamp(self, timestamp_str: str) -> str:
+        """타임스탬프를 상대적 시간으로 변환"""
+        try:
+            timestamp = datetime.fromisoformat(timestamp_str)
+            now = datetime.now()
+            diff = now - timestamp
+            
+            if diff.days > 0:
+                return f"{diff.days}일 전"
+            elif diff.seconds > 3600:
+                hours = diff.seconds // 3600
+                return f"{hours}시간 전"
+            elif diff.seconds > 60:
+                minutes = diff.seconds // 60
+                return f"{minutes}분 전"
+            else:
+                return "방금 전"
+        except:
+            return "알 수 없음"
+
+    def get_dashboard_alerts(self) -> List[Dict[str, Any]]:
+        """대시보드 알림 생성 (실제 시스템 상태 기반)"""
+        alerts = []
+        
+        with sqlite3.connect(self.db_path) as conn:
+            # SQLite default text handling is already Unicode in Python 3
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            today = datetime.now().date().isoformat()
+            
+            # 1. 최근 실패 작업 확인 (상세 정보 포함)
+            failed_jobs = conn.execute("""
+                SELECT provider, COUNT(*) as count, 
+                       GROUP_CONCAT(DISTINCT error_message) as errors
+                FROM generation_jobs 
+                WHERE DATE(created_at) = ? AND status = 'failed'
+                GROUP BY provider
+            """, (today,)).fetchall()
+            
+            total_failed = sum(row[1] for row in failed_jobs)
+            if total_failed > 0:
+                error_details = []
+                for provider, count, errors in failed_jobs:
+                    if errors and '401 Unauthorized' in errors:
+                        error_details.append(f"{provider.upper()}: API 키 인증 실패 ({count}건)")
+                    elif errors and 'rate limit' in errors.lower():
+                        error_details.append(f"{provider.upper()}: 요청 한도 초과 ({count}건)")
+                    else:
+                        error_details.append(f"{provider.upper()}: {count}건 실패")
+                
+                alerts.append({
+                    'type': 'error',
+                    'message': f'오늘 총 {total_failed}건의 콘텐츠 생성 실패',
+                    'details': error_details,
+                    'action': 'API 설정 확인'
+                })
+            
+            # 2. 토큰 사용량 분석
+            total_jobs_today = conn.execute("""
+                SELECT COUNT(*) FROM generation_jobs 
+                WHERE DATE(created_at) = ?
+            """, (today,)).fetchone()[0]
+            
+            estimated_tokens = total_jobs_today * 1500  # 평균 토큰 수 추정
+            estimated_cost = self._calculate_estimated_cost()
+            
+            if estimated_cost > 5.0:  # $5 이상
+                alerts.append({
+                    'type': 'warning',
+                    'message': f'오늘 예상 비용이 ${estimated_cost:.2f}에 도달했습니다',
+                    'details': [f'총 {total_jobs_today}건 생성', f'추정 토큰: {estimated_tokens:,}개'],
+                    'action': '사용량 조정'
+                })
+            
+            # 3. 프로바이더별 성능 및 할당량 상태
+            providers = ['gemini', 'claude', 'openai']
+            for provider in providers:
+                provider_stats = conn.execute("""
+                    SELECT 
+                        COUNT(*) as total_jobs,
+                        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+                        AVG(CASE WHEN status = 'completed' THEN 1.0 ELSE 0.0 END) * 100 as success_rate
+                    FROM generation_jobs 
+                    WHERE DATE(created_at) = ? AND provider = ?
+                """, (today, provider)).fetchone()
+                
+                total, completed, failed, success_rate = provider_stats
+                
+                if total > 0:
+                    if success_rate < 70:  # 성공률 70% 미만
+                        alerts.append({
+                            'type': 'warning',
+                            'message': f'{provider.upper()} 프로바이더 성능 저하',
+                            'details': [
+                                f'성공률: {success_rate:.1f}%',
+                                f'완료: {completed}건, 실패: {failed}건'
+                            ],
+                            'action': 'API 상태 점검'
+                        })
+                    elif success_rate > 95 and total >= 5:  # 성공률 95% 이상
+                        alerts.append({
+                            'type': 'success',
+                            'message': f'{provider.upper()} 프로바이더 우수한 성능',
+                            'details': [
+                                f'성공률: {success_rate:.1f}%',
+                                f'총 {total}건 처리'
+                            ],
+                            'action': '계속 사용'
+                        })
+            
+            # 4. 진행중인 작업 모니터링
+            in_progress_count = conn.execute("""
+                SELECT COUNT(*) FROM generation_jobs 
+                WHERE status = 'in_progress'
+            """, ).fetchone()[0]
+            
+            if in_progress_count > 5:
+                # 진행중인 작업의 시작 시간 확인
+                old_jobs = conn.execute("""
+                    SELECT COUNT(*) FROM generation_jobs 
+                    WHERE status = 'in_progress' AND 
+                          datetime(created_at) < datetime('now', '-30 minutes')
+                """, ).fetchone()[0]
+                
+                if old_jobs > 0:
+                    alerts.append({
+                        'type': 'error',
+                        'message': f'{old_jobs}개의 작업이 30분 이상 진행 중입니다',
+                        'details': [f'전체 진행중: {in_progress_count}건'],
+                        'action': '작업 상태 확인 필요'
+                    })
+                else:
+                    alerts.append({
+                        'type': 'info',
+                        'message': f'{in_progress_count}개의 작업이 정상적으로 진행 중입니다',
+                        'action': '상태 모니터링'
+                    })
+            
+            # 5. 일일 할당량 및 성과 요약
+            completed_today = conn.execute("""
+                SELECT COUNT(*) FROM generation_jobs 
+                WHERE DATE(created_at) = ? AND status = 'completed'
+            """, (today,)).fetchone()[0]
+            
+            if completed_today > 20:  # 높은 생산성
+                alerts.append({
+                    'type': 'success',
+                    'message': f'오늘 {completed_today}건의 고품질 콘텐츠 생성 완료',
+                    'details': [
+                        f'실패율: {(total_failed/(completed_today+total_failed)*100):.1f}%' if completed_today+total_failed > 0 else '실패율: 0%',
+                        f'예상 비용: ${estimated_cost:.2f}'
+                    ],
+                    'action': '성과 분석'
+                })
+            
+            # 6. 사용자 활동 및 시스템 부하
+            active_users = conn.execute("""
+                SELECT COUNT(*) FROM users 
+                WHERE is_active = 1
+            """, ).fetchone()[0]
+            
+            if active_users == 0:
+                alerts.append({
+                    'type': 'warning',
+                    'message': '활성 사용자가 없습니다',
+                    'details': ['시스템 사용률 0%'],
+                    'action': '사용자 활성화 필요'
+                })
+            elif total_jobs_today / max(active_users, 1) > 10:  # 사용자당 10건 이상
+                alerts.append({
+                    'type': 'info',
+                    'message': f'높은 사용률: 사용자당 평균 {total_jobs_today/active_users:.1f}건 생성',
+                    'details': [f'활성 사용자: {active_users}명'],
+                    'action': '리소스 확장 고려'
+                })
+        
+        # 기본 알림이 없으면 시스템 정상 메시지 추가
+        if not alerts:
+            alerts.append({
+                'type': 'success',
+                'message': '모든 시스템이 정상 작동 중입니다',
+                'details': ['오류 없음', '정상 성능'],
+                'action': '상태 유지'
+            })
+        
+        return alerts
 
 
 # 전역 데이터베이스 인스턴스

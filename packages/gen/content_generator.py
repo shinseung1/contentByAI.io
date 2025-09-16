@@ -131,7 +131,7 @@ class ContentGenerator:
                 )
         
         try:
-            print(f"DEBUG: db_job.tone = {self.safe_print_str(str(db_job.tone))}")
+            print(f"DEBUG: db_job.tone = {str(db_job.tone)}")
         except UnicodeEncodeError:
             print("DEBUG: db_job.tone contains Unicode characters")
         try:
@@ -153,7 +153,7 @@ class ContentGenerator:
         )
         
         try:
-            print(f"DEBUG: response.tone = {self.safe_print_str(str(response.tone))}")
+            print(f"DEBUG: response.tone = {str(response.tone)}")
         except UnicodeEncodeError:
             print("DEBUG: response.tone contains Unicode characters")
         try:

@@ -10,7 +10,8 @@ from pydantic import BaseModel
 
 from packages.core.config import get_settings
 from packages.core.database import create_tables
-from apps.api.routers import bundles, generation, publishing, health
+from apps.api.routers import bundles, publishing, health
+from apps.api.routers import generation_simple as generation
 
 # 간단한 인메모리 인증
 USERS = {
@@ -102,6 +103,76 @@ def create_app() -> FastAPI:
     @app.post("/api/v1/auth/logout")
     async def logout():
         return {"success": True, "message": "Logged out successfully"}
+    
+    # Add simple test endpoint
+    @app.get("/api/v1/simple-test")
+    async def simple_test():
+        """Simple test endpoint."""
+        return {"message": "hello"}
+    
+    
+    @app.get("/api/v1/admin/dashboard/stats")
+    async def get_dashboard_stats():
+        """Get dashboard statistics."""
+        try:
+            from database import DatabaseManager
+            
+            db = DatabaseManager()
+            stats = db.get_dashboard_stats()
+            
+            return {
+                "success": True,
+                "data": stats
+            }
+        except Exception as e:
+            print(f"Error in get_dashboard_stats: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "data": None
+            }
+    
+    @app.get("/api/v1/admin/dashboard/activities")
+    async def get_recent_activities(limit: int = 10):
+        """Get recent activities."""
+        try:
+            from database import DatabaseManager
+            
+            db = DatabaseManager()
+            activities = db.get_recent_activities(limit=limit)
+            
+            return {
+                "success": True,
+                "data": activities
+            }
+        except Exception as e:
+            print(f"Error in get_recent_activities: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "data": []
+            }
+    
+    @app.get("/api/v1/admin/dashboard/alerts")
+    async def get_dashboard_alerts():
+        """Get dashboard alerts."""
+        try:
+            from database import DatabaseManager
+            
+            db = DatabaseManager()
+            alerts = db.get_dashboard_alerts()
+            
+            return {
+                "success": True,
+                "data": alerts
+            }
+        except Exception as e:
+            print(f"Error in get_dashboard_alerts: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "data": []
+            }
     
     return app
 

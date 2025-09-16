@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://127.0.0.1:8000/api/v1'
+const API_BASE_URL = 'http://127.0.0.1:3000/api/v1'
 
 export interface GenerationRequest {
   topic: string
@@ -28,11 +28,12 @@ export interface GenerationResponse {
   progress: number
   content?: {
     title: string
-    content: string
+    html_content?: string
+    content?: string
     markdown_content?: string
     summary?: string
-    tags: string[]
-    images: ImageInfo[]
+    tags?: string[]
+    images?: ImageInfo[]
   }
   error?: string
   created_at: string
@@ -41,7 +42,85 @@ export interface GenerationResponse {
   word_count?: number
 }
 
+export interface DashboardStats {
+  today_jobs: number
+  failed_jobs: number
+  in_progress_jobs: number
+  completed_jobs: number
+  active_users: number
+  provider_stats: Record<string, number>
+  estimated_cost: number
+}
+
+export interface DashboardActivity {
+  id: number
+  action: string
+  user: string
+  status: string
+  timestamp: string
+  model?: string
+  target?: string
+  provider?: string
+  workflow?: string
+}
+
+export interface DashboardAlert {
+  type: 'success' | 'info' | 'warning' | 'error'
+  message: string
+  details?: string[]
+  action: string
+}
+
 export const api = {
+  // Dashboard APIs
+  getDashboardStats: async (): Promise<DashboardStats> => {
+    const token = localStorage.getItem('authToken')
+    const response = await fetch(`${API_BASE_URL}/admin/dashboard/stats`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Failed to get dashboard stats: ${response.statusText}`)
+    }
+    
+    const result = await response.json()
+    return result.data
+  },
+
+  getDashboardActivities: async (limit: number = 10): Promise<DashboardActivity[]> => {
+    const token = localStorage.getItem('authToken')
+    const response = await fetch(`${API_BASE_URL}/admin/dashboard/activities?limit=${limit}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Failed to get dashboard activities: ${response.statusText}`)
+    }
+    
+    const result = await response.json()
+    return result.data
+  },
+
+  getDashboardAlerts: async (): Promise<DashboardAlert[]> => {
+    const token = localStorage.getItem('authToken')
+    const response = await fetch(`${API_BASE_URL}/admin/dashboard/alerts`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Failed to get dashboard alerts: ${response.statusText}`)
+    }
+    
+    const result = await response.json()
+    return result.data
+  },
+
   // Content Generation
   generateContent: async (request: GenerationRequest): Promise<GenerationJobResponse> => {
     const token = localStorage.getItem('authToken')
@@ -84,32 +163,34 @@ export const api = {
 
   listGenerationJobs: async (provider?: string): Promise<GenerationResponse[]> => {
     const token = localStorage.getItem('authToken')
-    const url = `${API_BASE_URL}/generation/jobs`
+    let url = `${API_BASE_URL}/generation/jobs`
+    
+    // Add provider query parameter if specified
+    if (provider) {
+      url += `?provider=${encodeURIComponent(provider)}`
+    }
+    
+    const headers: Record<string, string> = {}
+    
+    // Add authorization header only if token exists
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    
     const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
     })
     
     if (!response.ok) {
       throw new Error(`Failed to list jobs: ${response.statusText}`)
     }
 
-    const jobs: GenerationResponse[] = await response.json()
-    console.log('API response for listGenerationJobs:', jobs)
-    console.log('First job tone:', jobs[0]?.tone, 'word_count:', jobs[0]?.word_count)
-    jobs.forEach((job, index) => {
-      if (index < 3) {
-        console.log(`Job ${index}: tone=${job.tone}, word_count=${job.word_count}, job_id=${job.job_id}`)
-      }
-    })
+    const result = await response.json()
+    console.log('API response for listGenerationJobs:', result)
     
-    // Filter by provider if specified
-    if (provider) {
-      return jobs.filter(job => 
-        job.message?.includes(provider) || true // Return all for now
-      )
-    }
+    // Handle new API response format: {jobs: [...], count: n}
+    const jobs: GenerationResponse[] = result.jobs || result
+    console.log('Parsed jobs:', jobs)
     
     return jobs
   }
