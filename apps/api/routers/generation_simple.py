@@ -41,6 +41,26 @@ async def generate_content(
         # Generate job ID
         job_id = str(uuid.uuid4())
         
+        # Fix Korean topic encoding if needed
+        topic = request.topic
+        if request.target_language == "ko" and topic:
+            try:
+                # Try to fix common encoding issues with Korean text
+                if isinstance(topic, str):
+                    # Check if Korean characters are corrupted
+                    korean_chars = [c for c in topic if '\uAC00' <= c <= '\uD7AF']
+                    if len(korean_chars) == 0 and len(topic) > 0:
+                        print(f"DEBUG: No Korean chars found in topic, attempting fix: {repr(topic)}")
+                        # Try to recover Korean text from bytes
+                        topic_bytes = topic.encode('latin-1', errors='ignore')
+                        try:
+                            topic = topic_bytes.decode('utf-8')
+                            print(f"DEBUG: Fixed Korean topic: {repr(topic)}")
+                        except UnicodeDecodeError:
+                            print(f"DEBUG: Could not fix Korean topic encoding")
+            except Exception as e:
+                print(f"DEBUG: Error fixing Korean topic: {e}")
+        
         # Save job to database
         db = DatabaseManager()
         
@@ -51,7 +71,7 @@ async def generate_content(
         # Create the generation job record
         job = GenerationJob(
             job_id=job_id,
-            topic=request.topic,
+            topic=topic,  # Use the potentially fixed topic
             provider=request.provider or "gemini",  # Default to gemini
             tone=request.tone or "professional",
             word_count=request.word_count or 800,
@@ -68,7 +88,7 @@ async def generate_content(
         background_tasks.add_task(
             process_generation_job,
             job_id,
-            request.topic,
+            topic,  # Use the potentially fixed topic
             request.provider or "gemini",
             request.tone or "professional",
             request.word_count or 800,

@@ -1,6 +1,6 @@
 import React from 'react'
-import { Card, Form, Input, Button, Select, InputNumber, Switch, Typography, Space, message, List, Tag, Spin } from 'antd'
-import { EditOutlined, SendOutlined, HistoryOutlined, CheckCircleOutlined, LoadingOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
+import { Card, Form, Input, Button, Select, InputNumber, Switch, Typography, Space, message, List, Tag, Spin, Modal } from 'antd'
+import { EditOutlined, SendOutlined, HistoryOutlined, CheckCircleOutlined, LoadingOutlined, ExclamationCircleOutlined, EyeOutlined } from '@ant-design/icons'
 import { api, GenerationResponse } from '../services/api'
 
 const { Title, Text } = Typography
@@ -11,6 +11,8 @@ const Generation: React.FC = () => {
   const [loading, setLoading] = React.useState(false)
   const [jobs, setJobs] = React.useState<GenerationResponse[]>([])
   const [jobsLoading, setJobsLoading] = React.useState(false)
+  const [selectedJob, setSelectedJob] = React.useState<GenerationResponse | null>(null)
+  const [modalVisible, setModalVisible] = React.useState(false)
 
   const loadJobs = React.useCallback(async () => {
     setJobsLoading(true)
@@ -71,6 +73,10 @@ const Generation: React.FC = () => {
 
   const parseJobContent = (job: GenerationResponse) => {
     try {
+      // Debug logging
+      console.log('Job content type:', typeof job.content)
+      console.log('Job content:', job.content)
+      
       if (typeof job.content === 'string') {
         const parsed = JSON.parse(job.content)
         return {
@@ -80,13 +86,20 @@ const Generation: React.FC = () => {
       } else if (job.content && typeof job.content === 'object') {
         // Handle the actual API response structure with html_content
         const htmlContent = job.content.html_content || job.content.content
+        const title = job.content.title || '제목 없음'
+        const summary = job.content.summary || extractSummaryFromHtml(htmlContent) || '요약 없음'
+        
+        // Debug logging
+        console.log('Parsed title:', title)
+        console.log('Parsed summary:', summary)
+        
         return {
-          title: job.content.title || '제목 없음',
-          summary: job.content.summary || extractSummaryFromHtml(htmlContent) || '요약 없음'
+          title: title,
+          summary: summary
         }
       }
     } catch (error) {
-      console.error('Error parsing job content:', error)
+      console.error('Error parsing job content:', error, job)
     }
     
     return {
@@ -95,8 +108,14 @@ const Generation: React.FC = () => {
     }
   }
 
-  const extractSummaryFromHtml = (htmlContent: string | undefined) => {
+  const extractSummaryFromHtml = (htmlContent: string | undefined | any) => {
     if (!htmlContent) return ''
+    
+    // Ensure we have a string
+    if (typeof htmlContent !== 'string') {
+      console.log('htmlContent is not string:', typeof htmlContent, htmlContent)
+      return String(htmlContent).substring(0, 100) + '...'
+    }
     
     try {
       // If it's nested JSON, try to parse again
@@ -159,6 +178,47 @@ const Generation: React.FC = () => {
     } catch (error) {
       console.error('Error extracting summary:', error)
       return '요약을 불러올 수 없습니다'
+    }
+  }
+
+  const handleViewJob = (job: GenerationResponse) => {
+    setSelectedJob(job)
+    setModalVisible(true)
+  }
+
+  const renderJobContent = (job: GenerationResponse) => {
+    if (!job.content) {
+      return <div>콘텐츠가 없습니다.</div>
+    }
+
+    try {
+      let htmlContent = ''
+      let title = ''
+
+      if (typeof job.content === 'string') {
+        const parsed = JSON.parse(job.content)
+        htmlContent = parsed.html_content || parsed.content || ''
+        title = parsed.title || '제목 없음'
+      } else if (job.content && typeof job.content === 'object') {
+        htmlContent = job.content.html_content || job.content.content || ''
+        title = job.content.title || '제목 없음'
+      }
+
+      return (
+        <div>
+          <h2 style={{ marginBottom: '20px', color: '#1890ff' }}>{title}</h2>
+          <div 
+            dangerouslySetInnerHTML={{ __html: htmlContent }}
+            style={{
+              lineHeight: '1.6',
+              fontSize: '16px'
+            }}
+          />
+        </div>
+      )
+    } catch (error) {
+      console.error('Error rendering job content:', error)
+      return <div>콘텐츠를 표시할 수 없습니다.</div>
     }
   }
 
@@ -304,7 +364,12 @@ const Generation: React.FC = () => {
                     }
                   />
                   <div>
-                    <Button type="link" size="small">
+                    <Button 
+                      type="link" 
+                      size="small"
+                      icon={<EyeOutlined />}
+                      onClick={() => handleViewJob(job)}
+                    >
                       상세보기
                     </Button>
                   </div>
@@ -314,6 +379,22 @@ const Generation: React.FC = () => {
           />
         )}
       </Card>
+
+      <Modal
+        title="콘텐츠 상세보기"
+        open={modalVisible}
+        onCancel={() => setModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setModalVisible(false)}>
+            닫기
+          </Button>
+        ]}
+        width={900}
+        style={{ maxHeight: '80vh' }}
+        bodyStyle={{ maxHeight: '70vh', overflow: 'auto' }}
+      >
+        {selectedJob ? renderJobContent(selectedJob) : null}
+      </Modal>
     </div>
   )
 }

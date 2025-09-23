@@ -464,6 +464,20 @@ class ContentGenerator:
             temperature=config.temperature
         )
         
+        # Debug: Print prompts to understand what's being sent to AI
+        print(f"DEBUG: System prompt: {system_prompt[:200]}...")
+        print(f"DEBUG: User prompt: {user_prompt}")
+        # Debug Korean text handling specifically
+        if request.target_language == "ko":
+            print(f"DEBUG: Korean topic bytes: {request.topic.encode('utf-8')}")
+            print(f"DEBUG: Korean topic repr: {repr(request.topic)}")
+            print(f"DEBUG: Korean topic length: {len(request.topic)}")
+            # Test direct Korean characters in topic
+            korean_chars = [c for c in request.topic if '\uAC00' <= c <= '\uD7AF']
+            print(f"DEBUG: Korean characters found: {len(korean_chars)}")
+            if korean_chars:
+                print(f"DEBUG: First few Korean chars: {korean_chars[:5]}")
+        
         # Generate content
         async with client:
             response = await client.generate(ai_request)
@@ -538,9 +552,9 @@ class ContentGenerator:
         """Create system prompt for AI."""
         language_instruction = ""
         if request.target_language == "ko":
-            language_instruction = "모든 응답은 한국어로 작성해주세요."
+            language_instruction = "모든 응답은 반드시 한국어로 작성해주세요. You MUST respond in Korean language only."
         elif request.target_language == "en":
-            language_instruction = "Please respond in English."
+            language_instruction = "Please respond in English only."
         
         # Load template structure
         template_structure = self._load_template_structure()
@@ -726,120 +740,42 @@ class ContentGenerator:
 위 구조를 참고하여 동일한 패턴으로 작성하세요.
 """
         
-        return f"""당신은 한국어 여행/마일리지 전문 에디터입니다.
-
-{comparison_instruction}
-
-{top3_instruction}
-
-{template_instruction}
-
-**🎯 제목 생성 규칙 (매우 중요):**
-- 창의적이고 감각적인 제목 필수: "집에서도 맛집 김치찌개! 황금 레시피 대공개"
-- 흥미를 끄는 표현: "놓치면 후회하는", "진짜 알아야 할", "숨겨진 비밀", "완벽한 공략법"
-- 구체적 혜택 강조: "5분만에 완성", "비용 50% 절약", "실패 없는 방법"
-- 감정적 호소: "이제 걱정 끝!", "드디어 찾았다", "정말 쉬워요"
-
-**📝 콘텐츠 품질 기준:**
-- 각 소제목마다 최소 3-4개 문단 작성 (문단당 최소 150자 이상)
-- 구체적 사례, 수치, 단계별 설명으로 내용 풍부하게 작성
-- 실무에 바로 활용 가능한 상세한 정보 포함
-- 표와 리스트를 활용하여 정보를 체계적으로 정리
-- **오직 실용적이고 현재 유용한 정보만 포함**
-
-**📊 테이블 생성 필수 규칙 (매우 중요):**
-- 비교 정보가 있으면 반드시 비교표 작성 (장단점, 가격, 특징, 차이점 등)
-- 단계별 과정은 단계표로 정리 (절차, 순서, 방법 등)  
-- 수치/통계 데이터는 데이터표로 작성 (요금, 시간, 비용, 성과 등)
-- 분류 정보는 분류표로 정리 (유형, 종류, 카테고리 등)
-- **케이스별 추천표 필수**: 상황/목적별로 어떤 선택을 해야 하는지 상세 표 작성
-- 각 주요 섹션마다 최소 1개 이상의 테이블 포함 필수
-- 전체 글에서 최소 6-8개의 테이블 필수 포함 (케이스별 추천표 포함)
-- 테이블은 정보 전달의 핵심 수단으로 활용
-
-**📋 요약박스 생성 필수 규칙:**
-- **글의 마지막 부분에 요약박스 필수 포함**
-- 요약박스 내용: 핵심 포인트 3-5개, 최종 추천사항, 주의사항
-- 요약박스 디자인: 눈에 띄는 스타일로 별도 박스 처리
-- "📋 핵심 요약" 또는 "💡 정리하면" 등의 제목 사용 
-
-**작성 원칙:**
-- {request.word_count}단어 분량 (HTML 태그 제외)
-- 테이블 5-7개 이상 포함 (필수){"" if not is_comparison_topic else " - 비교 주제는 비교표 최소 3개 필수"}
-- 브런치 포맷: H2/H3 섹션 구성
-- 톤: {request.tone}
-- 언어: {request.target_language}
+        return f"""You are a professional content writer specializing in creating engaging and informative articles.
 
 {language_instruction}
 
-**🚨 중요: JSON 형식 준수 🚨**
-응답은 반드시 유효한 JSON 구조로 제공해주세요. HTML 속성의 따옴표는 반드시 \" 로 이스케이프해야 합니다.
+Your task is to create high-quality content about the given topic.
 
-응답 형식:
+**Content Requirements:**
+- Write approximately {request.word_count} words
+- Use tone: {request.tone}
+- Target language: {request.target_language}
+- Include relevant tables and sections
+
+**Response Format:**
+Please respond with valid JSON in this exact format:
 {{
-    "title": "창의적이고 매력적인 제목",
-    "html_content": "완전한 HTML 콘텐츠 (모든 HTML 속성의 따옴표는 반드시 \\\"로 이스케이프)",
-    "markdown_content": "체계적 구조의 마크다운 콘텐츠", 
-    "summary": "2-3문장의 핵심 요약",
-    "tags": ["실무", "가이드", "관련주제"],
+    "title": "Engaging and informative title",
+    "html_content": "Complete HTML content with proper styling",
+    "summary": "2-3 sentence summary of key points",
+    "tags": ["relevant", "tags", "here"],
 {image_instructions}
 }}
 
-**JSON 작성 규칙:**
-- HTML 속성의 모든 따옴표는 \" 형태로 이스케이프 필수
-- 예시: "html_content": "<h1 style=\\"color: #000\\">제목</h1>"
-- 줄바꿈은 \\n으로 표현
-- 백슬래시는 \\\\로 이스케이프
+**Important JSON Rules:**
+- Escape all HTML quotes properly: use \\" for HTML attributes
+- Example: "html_content": "<h1 style=\\"color: #000\\">Title</h1>"
+- Use \\n for line breaks
+- Escape backslashes as \\\\
 
-**🎨 HTML 스타일 참고** (JSON에 넣을 때는 반드시 따옴표 이스케이프!):
-- **메인 제목**: <h1 style="color: #2c3e50; font-size: 2.8em; font-weight: 800; margin-bottom: 0.8em; line-height: 1.2; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">창의적인 제목</h1>
-- **도입부**: <div style="color: #2c3e50; font-size: 1.2em; line-height: 1.9; margin-bottom: 3em; background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 50%, #ffeaa7 100%); padding: 30px; border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(10px); position: relative; overflow: hidden;">
-    <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); pointer-events: none;"></div>
-    <div style="position: relative; z-index: 1;">✨ 인트로 내용</div>
-</div>
-- **섹션 제목**: <h2 style="color: #2c3e50; font-size: 2.1em; font-weight: 700; margin-top: 3.5em; margin-bottom: 1.5em; background: linear-gradient(135deg, #74b9ff 0%, #0984e3 50%, #6c5ce7 100%); padding: 20px 30px; border-radius: 15px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); text-align: center; color: white; transform: perspective(1000px) rotateX(5deg); transition: all 0.3s ease;">🎯 섹션제목</h2>
-- **이미지 삽입**: <img src="이미지URL" alt="설명" style="width: 100%; max-width: 700px; height: auto; margin: 2em auto; display: block; border-radius: 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.2); border: 4px solid white; filter: brightness(1.05) contrast(1.1);">
-- **본문**: <p style="color: #2c3e50; line-height: 1.9; font-size: 17px; margin-bottom: 2em; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 25px; border-radius: 12px; border-left: 6px solid #74b9ff; box-shadow: 0 4px 16px rgba(0,0,0,0.08); font-weight: 400;">상세한 본문 내용</p>
-- **강조**: <strong style="color: white; font-weight: 700; background: linear-gradient(135deg, #e17055 0%, #d63031 50%, #e84393 100%); padding: 4px 10px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">중요한 내용</strong>
-- **리스트**: <ul style="color: #2c3e50; margin: 2em 0; padding: 25px; background: linear-gradient(135deg, #ddd6fe 0%, #c084fc 20%, #e879f9 100%); border-radius: 15px; box-shadow: 0 6px 24px rgba(0,0,0,0.12); list-style: none;"><li style="margin-bottom: 1em; line-height: 1.7; background: white; padding: 15px 20px; border-radius: 10px; margin: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #74b9ff; font-weight: 500; transition: all 0.3s ease;">🔹 항목: 상세 설명</li></ul>
-- **테이블**: <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin: 2em 0; border-radius: 15px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.15); background: white;"><thead><tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);"><th style="border: none; padding: 20px; text-align: center; font-weight: 700; color: white; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">항목</th><th style="border: none; padding: 20px; text-align: center; font-weight: 700; color: white; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">기준</th><th style="border: none; padding: 20px; text-align: center; font-weight: 700; color: white; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">혜택</th></tr></thead><tbody><tr style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);"><td style="border: none; padding: 18px; color: #2c3e50; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.05); font-weight: 500;">내용</td></tr></tbody></table>
-- **팁 박스**: <div style="background: linear-gradient(135deg, #fdcb6e 0%, #e17055 50%, #fd79a8 100%); border: none; padding: 25px; margin: 2.5em 0; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); position: relative; overflow: hidden;">
-    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%); pointer-events: none;"></div>
-    <p style="color: white; margin: 0; font-style: italic; font-weight: 600; font-size: 16px; position: relative; z-index: 1; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">💡 실전 팁: 구체적인 조언</p>
-</div>
-- **구분선**: <hr style="border: none; height: 4px; background: linear-gradient(90deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #667eea 75%, #764ba2 100%); margin: 4em 0; border-radius: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-- **주의사항**: <span style="color: white; font-weight: 700; background: linear-gradient(135deg, #ff6b6b 0%, #feca57 50%, #ff9ff3 100%); padding: 12px 20px; border-radius: 25px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); display: inline-block; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px;">⚠️ 주의사항</span>
-- **카드 박스**: <div style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); padding: 30px; margin: 25px 0; border-radius: 20px; box-shadow: 0 12px 48px rgba(0,0,0,0.12); border: 1px solid rgba(0,0,0,0.05); backdrop-filter: blur(10px); position: relative; overflow: hidden;">
-    <div style="position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; background: linear-gradient(135deg, #667eea, #764ba2, #f093fb); border-radius: 22px; z-index: -1;"></div>
-    카드 내용
-</div>
-- **링크 버튼**: <div style="text-align: center; margin: 25px 0;"><a href="#" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); color: white; text-decoration: none; font-weight: 700; font-size: 15px; padding: 15px 30px; border-radius: 50px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); transform: translateY(0); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-transform: uppercase; letter-spacing: 1px; position: relative; overflow: hidden;">
-    <span style="position: relative; z-index: 1;">버튼 텍스트</span>
-    <div style="position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); transition: all 0.5s;"></div>
-</a></div>
-- **요약박스**: <div style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 50%, #6c5ce7 100%); padding: 35px; margin: 3em 0; border-radius: 25px; box-shadow: 0 15px 50px rgba(0,0,0,0.2); border: 3px solid rgba(255,255,255,0.1); position: relative; overflow: hidden;">
-    <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%); pointer-events: none;"></div>
-    <h3 style="color: white; margin: 0 0 25px 0; font-size: 1.6em; font-weight: 800; text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.3); position: relative; z-index: 1;">📋 핵심 요약</h3>
-    <div style="color: white; line-height: 1.8; font-size: 16px; font-weight: 500; position: relative; z-index: 1; text-shadow: 0 1px 3px rgba(0,0,0,0.2);">요약 내용</div>
-</div>
+**Basic HTML Styling:**
+- Use proper headings: <h1>, <h2>, <h3>
+- Style text with CSS: color: #333; font-size: 16px;
+- Add proper paragraph spacing
+- Include tables when appropriate
+- Use clear and readable formatting
 
-**중요: 절대 흰색(#ffffff, #fff, white) 또는 매우 밝은 색상을 사용하지 마세요.**
-
-마크다운 작성 규칙 (브런치 스타일):
-- 제목: # 메인 제목
-- 인트로를 위한 구분: > 인트로 내용 (인용문으로 표현)
-- 부제목: ## 부제목  
-- 소제목: ### 소제목
-- 본문: 일반 텍스트 (줄바꿈 두 번으로 문단 구분)
-- 강조: **강조 텍스트**
-- 리스트: - 항목 또는 1. 번호 항목
-- 표 형식: | 제목1 | 제목2 | 제목3 | (마크다운 테이블 문법 사용)
-- 팁/정보: > 💡 **유용한 팁**: 팁 내용
-- 관련 링크: [소제목](#) (버튼 형태로 표현)
-
-**목표 단어 수({request.word_count}단어)에 정확히 맞춰 작성하되, 브런치 스타일의 깔끔하고 체계적인 구조를 유지하세요.**
-
-**⚠️ 필수사항: 각 섹션마다 관련페이지로 이동할 수 있는 링크를 반드시 포함해야 합니다!**"""
+Write content that is informative, well-structured, and engaging."""
     
     def _create_user_prompt(self, request: GenerationRequest) -> str:
         """Create user prompt for AI."""
@@ -852,48 +788,15 @@ class ContentGenerator:
         min_words = request.word_count - margin
         max_words = request.word_count + margin
         
-        word_count_instruction = f"""1. **🚨 절대적 단어수 준수 🚨**: HTML 태그를 완전히 제외한 순수 텍스트가 반드시 {min_words}-{max_words}단어 사이여야 합니다.
-   
-   ⚠️ 중요 계산 방식:
-   - 목표 단어수: {request.word_count}단어
-   - 허용 범위: {min_words}단어 ~ {max_words}단어 (±{margin}단어)
-   - HTML 태그는 단어수에 포함되지 않습니다
-   - <p>, <h1>, <div> 등 모든 태그 제외하고 순수 텍스트만 계산
-   
-   📝 작성 전략 (절대 준수):
-   - 현재 {request.word_count}단어는 상당히 긴 분량입니다 - 반드시 이 분량을 채워야 합니다
-   - 각 섹션을 매우 상세하고 길게 작성하세요 (섹션당 최소 150-200단어)
-   - 구체적 예시, 상세한 설명, 실무 팁을 풍부하게 추가
-   - 8-12개 정도의 상세한 섹션으로 구성 
-   - 단어수가 부족하면 반드시 더 많은 내용 추가
-   - 모든 문단은 최소 3-4문장 이상으로 구성
-   - 나열형 설명보다는 서술형 상세 설명 위주로 작성
-   - 반드시 {min_words}단어 이상 작성 - 이것은 절대 기준입니다!"""
-            
-        important_points = f"""{word_count_instruction}
-2. HTML 버전과 마크다운 버전 모두 제공하세요
-{image_instructions}
-4. **인라인 텍스트 링크 필수**: 콘텐츠 내용 중에 구체적인 장소, 서비스, 앱 언급 시 반드시 "(https://...)" 형태로 링크 추가
-   - 스탠리 파크 언급 시: "스탠리 파크(https://vancouver.ca/parks-recreation-culture/stanley-park.aspx)"
-   - 환전 서비스: "환전하기(https://wise.com/kr/currency-converter/cad-to-krw-rate)"  
-   - 교통 앱: "TransLink(https://www.translink.ca/)" + "Uber(https://www.uber.com/)"
-   - 관광명소: 각 명소의 공식 홈페이지 링크
-   - 교통수단: 공식 교통기관 사이트 링크
-   - 예약 사이트: 공식 예약 서비스 링크
-5. HTML에는 인라인 스타일을 적용하세요
-6. **모든 텍스트는 검정색(#000000)을 기본으로 사용하세요** - 제목, 부제목, 소제목, 본문 모두 검정색
-7. **오직 강조 부분만 색상 사용**: 중요한 키워드나 강조 텍스트에만 색상을 적용하세요
-8. 완전한 HTML 구조로 작성하여 웹페이지에 바로 표시 가능하게 만드세요
-9. 절대 흰색(#ffffff, #fff, white)이나 매우 밝은 색상은 사용하지 마세요
-10. **섹션별 링크 금지**: 섹션 제목 뒤에 "자세히 보기", "바로가기" 등의 별도 링크 버튼을 만들지 마세요. 오직 인라인 링크만 사용
-11. **절대 Google 검색 링크 금지**: 어떤 경우에도 google.com/search 형태의 링크를 만들지 마세요
-12. **링크 생성 전면 금지**: 섹션별 링크, 외부 링크, 참조 링크 등 모든 <a> 태그 링크 생성을 하지 마세요
+        return f"""Please write an article about: {request.topic}
 
-**🔥 추가 필수 요구사항 (절대 준수):**
-13. **케이스별 추천표 반드시 포함**: 다양한 상황/목적에 따른 추천 항목을 표로 정리
-14. **요약박스 필수**: 글의 마지막에 핵심 내용을 정리한 요약박스를 반드시 포함하세요
-15. **이미지는 실제 img 태그로 생성**: 텍스트 설명이 아닌 실제 <img> 태그를 사용하세요
-16. **다중 항목 주제의 경우**: 명시된 숫자만큼 정확히 모든 선택지/항목을 다뤄야 합니다"""
+Requirements:
+- Write approximately {request.word_count} words
+- Use tone: {request.tone} 
+- Target language: {request.target_language}
+{image_instructions}
+
+Please provide a well-structured, informative article with proper HTML formatting."""
 
     def _get_tone_specific_guidelines(self, tone: str) -> str:
         """Get tone-specific content guidelines to avoid inappropriate content."""

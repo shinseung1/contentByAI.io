@@ -17,7 +17,7 @@ class OpenAIClient(BaseAIClient):
         """Get headers for OpenAI API."""
         return {
             "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json; charset=utf-8"
+            "Content-Type": "application/json"
         }
     
     async def generate(self, request: AIRequest) -> AIResponse:
