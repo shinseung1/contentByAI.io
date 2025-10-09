@@ -1,18 +1,21 @@
-import React, { useState } from 'react'
-import { Card, List, Button, Typography, Tag, Space, Drawer, Form, Input, Select, message } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Card, List, Button, Typography, Tag, Space, Drawer, Form, Input, Select, message, Spin, Switch } from 'antd'
 import { FileTextOutlined, EditOutlined, PlusOutlined, PlayCircleOutlined, HistoryOutlined } from '@ant-design/icons'
+import { API_BASE_URL } from '../../services/api'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
 
 interface WorkflowTemplate {
-  id: string
+  id: number
   name: string
   description: string
   steps: WorkflowStep[]
   version: string
   status: string
   created_at: string
+  updated_at?: string
+  created_by?: number
 }
 
 interface WorkflowStep {
@@ -26,37 +29,112 @@ const AdminWorkflows: React.FC = () => {
   const [drawerVisible, setDrawerVisible] = useState(false)
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowTemplate | null>(null)
   const [form] = Form.useForm()
+  const [workflows, setWorkflows] = useState<WorkflowTemplate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
 
-  const workflows: WorkflowTemplate[] = [
-    {
-      id: '1',
-      name: '기본 블로그 포스트',
-      description: 'outline → draft → fact-check → seo → publish',
-      steps: [
-        { name: '아웃라인 생성', prompt_template: '다음 주제로 블로그 아웃라인을 작성해주세요: {topic}', approver_role: 'editor', auto_transition: true },
-        { name: '초안 작성', prompt_template: '다음 아웃라인을 바탕으로 상세한 초안을 작성해주세요: {outline}', approver_role: 'editor', auto_transition: false },
-        { name: '사실 검증', prompt_template: '다음 내용의 사실을 검증하고 출처를 추가해주세요: {draft}', approver_role: 'admin', auto_transition: false },
-        { name: 'SEO 최적화', prompt_template: '다음 콘텐츠를 SEO에 최적화해주세요: {content}', approver_role: 'editor', auto_transition: true },
-        { name: '발행', prompt_template: '', approver_role: 'admin', auto_transition: false }
-      ],
-      version: 'v1.2',
-      status: 'active',
-      created_at: '2024-01-15'
-    },
-    {
-      id: '2',
-      name: '소셜 미디어 포스트',
-      description: 'draft → optimize → schedule',
-      steps: [
-        { name: '초안 생성', prompt_template: 'SNS용 짧은 포스트를 작성해주세요: {topic}', approver_role: 'editor', auto_transition: true },
-        { name: '최적화', prompt_template: '다음 포스트를 플랫폼에 맞게 최적화해주세요: {draft}', approver_role: 'editor', auto_transition: true },
-        { name: '예약 발행', prompt_template: '', approver_role: 'editor', auto_transition: false }
-      ],
-      version: 'v1.0',
-      status: 'active',
-      created_at: '2024-02-01'
+  useEffect(() => {
+    fetchWorkflows()
+  }, [])
+
+  const fetchWorkflows = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch(`${API_BASE_URL}/workflows/`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const data = await response.json()
+      setWorkflows(data)
+    } catch (error) {
+      console.error('Failed to fetch workflows:', error)
+      message.error('워크플로우 목록을 불러오는데 실패했습니다')
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
+
+  const handleSaveWorkflow = async (values: any) => {
+    try {
+      setSubmitting(true)
+      
+      const workflowData = {
+        name: values.name,
+        description: values.description,
+        steps: values.steps || [],
+        version: values.version || 'v1.0',
+        status: values.status || 'active'
+      }
+      
+      let response
+      if (selectedWorkflow) {
+        // Update existing workflow
+        response = await fetch(`${API_BASE_URL}/workflows/${selectedWorkflow.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(workflowData)
+        })
+      } else {
+        // Create new workflow
+        response = await fetch(`${API_BASE_URL}/workflows/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(workflowData)
+        })
+      }
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Failed to save workflow')
+      }
+      
+      message.success(`워크플로우가 ${selectedWorkflow ? '수정' : '생성'}되었습니다`)
+      setDrawerVisible(false)
+      form.resetFields()
+      fetchWorkflows() // Refresh the list
+    } catch (error) {
+      console.error('Save workflow error:', error)
+      message.error(`저장 중 오류가 발생했습니다: ${error.message}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleActivateWorkflow = async (workflowId: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/workflows/${workflowId}/activate`, {
+        method: 'POST'
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to activate workflow')
+      }
+      
+      message.success('워크플로우가 활성화되었습니다')
+      fetchWorkflows() // Refresh the list
+    } catch (error) {
+      console.error('Activate workflow error:', error)
+      message.error('워크플로우 활성화에 실패했습니다')
+    }
+  }
+
+  const handleDeactivateWorkflow = async (workflowId: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/workflows/${workflowId}/deactivate`, {
+        method: 'POST'
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to deactivate workflow')
+      }
+      
+      message.success('워크플로우가 비활성화되었습니다')
+      fetchWorkflows() // Refresh the list
+    } catch (error) {
+      console.error('Deactivate workflow error:', error)
+      message.error('워크플로우 비활성화에 실패했습니다')
+    }
+  }
 
   const handleEditWorkflow = (workflow: WorkflowTemplate) => {
     setSelectedWorkflow(workflow)
@@ -70,16 +148,6 @@ const AdminWorkflows: React.FC = () => {
     setDrawerVisible(true)
   }
 
-  const handleSaveWorkflow = async (values: any) => {
-    try {
-      console.log('Saving workflow:', values)
-      message.success('워크플로우가 저장되었습니다')
-      setDrawerVisible(false)
-      form.resetFields()
-    } catch (error) {
-      message.error('저장 중 오류가 발생했습니다')
-    }
-  }
 
   return (
     <div>
@@ -102,21 +170,31 @@ const AdminWorkflows: React.FC = () => {
       </div>
 
       <Card>
-        <List
-          itemLayout="vertical"
-          dataSource={workflows}
-          renderItem={(workflow) => (
-            <List.Item
-              actions={[
+        <Spin spinning={loading}>
+          <List
+            itemLayout="vertical"
+            dataSource={workflows}
+            locale={{
+              emptyText: workflows.length === 0 ? '워크플로우 템플릿이 없습니다' : '데이터를 불러오는 중...'
+            }}
+            renderItem={(workflow) => (
+              <List.Item
+                actions={[
                 <Button key="edit" icon={<EditOutlined />} onClick={() => handleEditWorkflow(workflow)}>
                   편집
                 </Button>,
                 <Button key="history" icon={<HistoryOutlined />}>
                   버전 이력
                 </Button>,
-                <Button key="activate" icon={<PlayCircleOutlined />} type="primary">
-                  활성화
-                </Button>
+                workflow.status === 'active' ? (
+                  <Button key="deactivate" icon={<PlayCircleOutlined />} onClick={() => handleDeactivateWorkflow(workflow.id)}>
+                    비활성화
+                  </Button>
+                ) : (
+                  <Button key="activate" icon={<PlayCircleOutlined />} type="primary" onClick={() => handleActivateWorkflow(workflow.id)}>
+                    활성화
+                  </Button>
+                )
               ]}
             >
               <List.Item.Meta
@@ -150,9 +228,10 @@ const AdminWorkflows: React.FC = () => {
                   </div>
                 }
               />
-            </List.Item>
-          )}
-        />
+              </List.Item>
+            )}
+          />
+        </Spin>
       </Card>
 
       <Drawer
@@ -163,7 +242,7 @@ const AdminWorkflows: React.FC = () => {
         extra={
           <Space>
             <Button onClick={() => setDrawerVisible(false)}>취소</Button>
-            <Button type="primary" onClick={() => form.submit()}>
+            <Button type="primary" loading={submitting} onClick={() => form.submit()}>
               저장
             </Button>
           </Space>

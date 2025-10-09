@@ -35,18 +35,7 @@ class OpenAIClient(BaseAIClient):
             
             response_data = response.json()
             
-            # Fix encoding issue for Korean text
-            if response_data.get("choices") and len(response_data["choices"]) > 0:
-                content = response_data["choices"][0].get("message", {}).get("content", "")
-                if content:
-                    try:
-                        # Try to fix encoding
-                        content_bytes = content.encode('latin-1')
-                        content = content_bytes.decode('utf-8')
-                        response_data["choices"][0]["message"]["content"] = content
-                    except (UnicodeDecodeError, UnicodeEncodeError):
-                        # If encoding fix fails, keep original
-                        pass
+            # OpenAI API returns proper UTF-8 encoded content, no encoding fix needed
             
             return self._parse_response(response_data)
         except Exception as e:

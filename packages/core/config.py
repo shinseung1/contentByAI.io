@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     CLAUDE_API_KEY: Optional[str] = Field(None, description="Claude API key")
     CLAUDE_MODEL: str = Field("claude-3-sonnet-20240229", description="Claude model")
     GEMINI_API_KEY: Optional[str] = Field(None, description="Gemini API key")
-    GEMINI_MODEL: str = Field("gemini-1.5-pro", description="Gemini model")
+    GEMINI_MODEL: str = Field("gemini-2.5-flash", description="Gemini model")
     GROK_API_KEY: Optional[str] = Field(None, description="Grok API key")
     GROK_MODEL: str = Field("grok-beta", description="Grok model")
     

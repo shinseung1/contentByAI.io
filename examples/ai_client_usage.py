@@ -102,7 +102,7 @@ async def example_all_providers():
         },
         AIProvider.GEMINI: {
             "api_key": os.getenv("GEMINI_API_KEY"),
-            "model": "gemini-1.5-pro"
+            "model": os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
         },
         AIProvider.GROK: {
             "api_key": os.getenv("GROK_API_KEY"),

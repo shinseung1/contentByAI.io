@@ -1,0 +1,15 @@
+=== KOREAN TEST AFTER SERVER RESTART ===
+Job ID: 565c9a57-7aaf-436b-af58-e1d570838fab
+Status: completed
+Original topic: 한국의 K-팝 문화와 세계적 영향
+Topic in DB: 한국의 K-팝 문화와 세계적 영향
+
+Generated title: Content about 한국의 K-팝 문화와 세계적 영향
+Korean words in title: 5
+Korean words in content: 848
+
+Content preview (first 1000 chars):
+```json { "title": "K-팝, 음악을 넘어선 세계 문화 현상 탐구", "html_content": "<div style="font-family: 'Noto Sans KR', sans-serif; line-height: 1.6; padding: 20px; background-color: #000000;"><h1 style="text-align: center; background: linear-gradient(to right, #6a11cb 0%, #2575fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 2.5em; margin-bottom: 20px;"> K-팝, 음악을 넘어선 세계 문화 현상 탐구 </h1><p style="text-align: center; font-size: 1.1em; color: #000000; margin-bottom: 40px;"> K-팝의 다채로운 매력과 팬덤 문화, 그리고 세계적인 영향력을 깊이 이해하고 싶다면 주목하세요! </p><h2 style="color: #000000; margin-top: 30px; margin-bottom: 15px; padding-bottom: 5px; border-bottom: 2px solid #e0e0e0;"><span style="background-color: #000000; padding: 5px 10px; border-radius: 5px;"> 어디로 갈까?</span> K-팝의 세계적 위상 개요 </h2><p style="color: #000000; margin-bottom: 10px;"> K-팝은 단순한 음악 장르를 넘어선 하나의 거대한 문화 현상으로 자리매김했습니다. 한국 대중음악의 독특한 스타일과 뛰어난 퍼포먼스, 그리고 적극적인 팬덤 문화가 결합하여 전 세계 음악 시장에 새로운 바람을 불어넣고 있습니다. 빌보드 차트 상위권 진입은 물론, 세계 각국에서 K...
+
+SUCCESS: Korean characters found in both title and content!
+The encoding fix has been successfully applied.

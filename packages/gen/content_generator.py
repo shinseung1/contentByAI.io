@@ -11,30 +11,42 @@ from pathlib import Path
 
 
 def safe_print(text):
-    """Safe text for printing that replaces problematic Unicode with ? for debugging."""
+    """Safe text for printing that replaces problematic Unicode with ? for debugging.
+    IMPORTANT: This function preserves Korean characters (Hangul: U+AC00-U+D7AF)."""
     if not isinstance(text, str):
         return text
+    
+    # Precise emoji pattern that excludes Korean characters
     emoji_pattern = re.compile("["
                               u"\U0001F600-\U0001F64F"  # emoticons
                               u"\U0001F300-\U0001F5FF"  # symbols & pictographs
                               u"\U0001F680-\U0001F6FF"  # transport & map symbols
                               u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
-                              u"\U00002600-\U000027B0"  # includes airplane ✈ symbol
-                              u"\U000024C2-\U0001F251"
+                              u"\U00002600-\U000027B0"  # misc symbols
+                              u"\U000024C2-\U000024FF"  # enclosed symbols
+                              u"\U00002700-\U000027BF"  # dingbats
+                              u"\U0001F900-\U0001F9FF"  # supplemental symbols
                               "]+", flags=re.UNICODE)
     return emoji_pattern.sub('?', text)
 
 def remove_emojis(text):
-    """Remove emoji characters from text to avoid encoding issues on Windows cp949."""
+    """Remove emoji characters from text to avoid encoding issues on Windows cp949.
+    IMPORTANT: This function preserves Korean characters (Hangul: U+AC00-U+D7AF)."""
     if not isinstance(text, str):
         return text
+    
+    # Precise emoji pattern that excludes Korean characters
+    # Korean Hangul Syllables: U+AC00-U+D7AF
+    # Korean Jamo: U+1100-U+11FF, U+3130-U+318F
     emoji_pattern = re.compile("["
                               u"\U0001F600-\U0001F64F"  # emoticons
                               u"\U0001F300-\U0001F5FF"  # symbols & pictographs
                               u"\U0001F680-\U0001F6FF"  # transport & map symbols
                               u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
-                              u"\U00002600-\U000027B0"  # includes airplane ✈ symbol
-                              u"\U000024C2-\U0001F251"
+                              u"\U00002600-\U000027B0"  # misc symbols (airplane, etc)
+                              u"\U000024C2-\U000024FF"  # enclosed symbols
+                              u"\U00002700-\U000027BF"  # dingbats
+                              u"\U0001F900-\U0001F9FF"  # supplemental symbols
                               "]+", flags=re.UNICODE)
     return emoji_pattern.sub('', text)
 
@@ -57,9 +69,233 @@ class ContentGenerator:
         self.db = DatabaseManager()
         self.image_service = ImageService()
     
+    def safe_print_str(self, text):
+        """Safe print method for backward compatibility.
+        IMPORTANT: This function preserves Korean characters (Hangul: U+AC00-U+D7AF)."""
+        if not isinstance(text, str):
+            return str(text)
+        
+        # Precise emoji pattern that excludes Korean characters
+        import re
+        emoji_pattern = re.compile("["
+                                  u"\U0001F600-\U0001F64F"  # emoticons
+                                  u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+                                  u"\U0001F680-\U0001F6FF"  # transport & map symbols
+                                  u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                                  u"\U00002600-\U000027B0"  # misc symbols
+                                  u"\U000024C2-\U000024FF"  # enclosed symbols
+                                  u"\U00002700-\U000027BF"  # dingbats
+                                  u"\U0001F900-\U0001F9FF"  # supplemental symbols
+                                  "]+", flags=re.UNICODE)
+        return emoji_pattern.sub(r'?', text)
+    
     def create_job_id(self) -> str:
         """Create a unique job ID."""
         return str(uuid.uuid4())
+    
+    def _load_guidance(self) -> dict:
+        """Load guidance data from YAML file."""
+        try:
+            import yaml
+            from pathlib import Path
+            
+            guidance_file = Path(__file__).parent / "guidance.yaml"
+            with open(guidance_file, "r", encoding="utf-8") as f:
+                return yaml.safe_load(f)
+        except Exception as e:
+            print(f"Warning: Could not load guidance.yaml, using fallback: {e}")
+            return {}
+    
+    def _categorize_topic(self, topic: str) -> str:
+        """Categorize topic based on keywords."""
+        topic_lower = topic.lower()
+        
+        # 카테고리별 키워드 매핑
+        category_keywords = {
+            'food': ['음식', '요리', '맛집', '레시피', '음식점', '식당', '카페', '디저트', '먹거리'],
+            'health': ['건강', '질병', '치료', '의료', '병원', '약물', '운동', '다이어트', '영양'],
+            'tourism': ['여행', '관광', '명소', '여행지', '휴가', '호텔', '숙소', '관광지'],
+            'transportation': ['교통', '지하철', '버스', '택시', '항공', '기차', '배', '이동'],
+            'technology': ['기술', 'IT', '컴퓨터', '소프트웨어', '앱', '프로그램', '인공지능', 'AI'],
+            'education': ['교육', '학습', '공부', '강의', '수업', '학교', '대학', '자격증'],
+            'business': ['비즈니스', '사업', '창업', '마케팅', '경영', '회사', '직장'],
+            'lifestyle': ['라이프스타일', '생활', '일상', '취미', '여가', '인테리어', '패션'],
+            'finance': ['금융', '투자', '주식', '부동산', '재테크', '보험', '대출', '경제'],
+            'sports': ['스포츠', '운동', '헬스', '피트니스', '축구', '야구', '농구', '게임'],
+            'culture': ['문화', '예술', '음악', '영화', '드라마', '책', '전시', '공연']
+        }
+        
+        for category, keywords in category_keywords.items():
+            if any(keyword in topic_lower for keyword in keywords):
+                return category
+        
+        return 'default'
+    
+    def _detect_topic_type(self, topic: str) -> tuple:
+        """Detect if topic is comparison or ranking type."""
+        topic_lower = topic.lower()
+        
+        # 비교 주제 감지
+        is_comparison = any(keyword in topic_lower for keyword in ['vs', 'versus', '대', '비교', '차이'])
+        
+        # 랭킹 주제 감지
+        import re
+        ranking_patterns = [
+            r'top\s*(\d+)', r'톱\s*(\d+)', r'베스트\s*(\d+)', r'best\s*(\d+)', 
+            r'추천\s*(\d+)', r'(\d+)가지', r'(\d+)개', r'(\d+)종류', 
+            r'(\d+)위', r'(\d+)순위'
+        ]
+        
+        ranking_number = None
+        for pattern in ranking_patterns:
+            match = re.search(pattern, topic_lower)
+            if match:
+                ranking_number = int(match.group(1))
+                break
+        
+        # 한국어 숫자 처리
+        korean_numbers = {
+            '세': 3, '삼': 3, '네': 4, '사': 4, '다섯': 5, '오': 5,
+            '여섯': 6, '육': 6, '일곱': 7, '칠': 7, '여덟': 8, '팔': 8,
+            '아홉': 9, '구': 9, '열': 10
+        }
+        
+        if not ranking_number:
+            for korean_num, num_val in korean_numbers.items():
+                if korean_num in topic_lower and ('가지' in topic_lower or '개' in topic_lower):
+                    ranking_number = num_val
+                    break
+        
+        return is_comparison, ranking_number
+    
+    def _get_workflow_template(self, topic: str = "", template_name: str = None, template_id: int = None) -> str:
+        """Get workflow template from database based on topic or name."""
+        try:
+            from database import DatabaseManager
+            db = DatabaseManager()
+            
+            # Priority 1: Get specific template by ID
+            if template_id:
+                template = db.get_workflow_template(template_id)
+                if template and template.status == 'active':
+                    import json
+                    steps = json.loads(template.steps)
+                    # Use the first step's prompt template
+                    if steps and len(steps) > 0:
+                        print(f"DEBUG: Using workflow template by ID: {template.name}")
+                        return steps[0].get('prompt_template', '')
+            
+            # Priority 2: Get specific template by name
+            if template_name:
+                # Get specific template by name
+                templates = db.get_active_workflow_templates()
+                for template in templates:
+                    if template.name == template_name:
+                        import json
+                        steps = json.loads(template.steps)
+                        # Use the first step's prompt template
+                        if steps and len(steps) > 0:
+                            return steps[0].get('prompt_template', '')
+            else:
+                # Smart template selection based on topic
+                templates = db.get_active_workflow_templates()
+                selected_template = None
+                
+                # Topic-based template selection
+                topic_lower = topic.lower()
+                
+                # 여행 관련 키워드들
+                travel_keywords = ['여행', '관광', '휴가', '해외', '국내여행', '배낭여행', '신혼여행', 
+                                 '가족여행', 'solo여행', '혼여행', '호텔', '펜션', '맛집', '관광지', 
+                                 '여행지', '명소', '축제', '문화', '역사', '자연', '바다', '산', 
+                                 '온천', '캠핑', '트레킹', '하이킹', '스키', '해변', '섬', '도시',
+                                 'travel', 'trip', 'tour', 'vacation', 'destination', 'hotel',
+                                 '일본', '중국', '동남아', '유럽', '미국', '태국', '베트남',
+                                 '서울', '부산', '제주도', '강원도', '경주', '전주']
+                
+                # 시사 관련 키워드들  
+                news_keywords = ['정치', '경제', '사회', '국제', '뉴스', '이슈', '정책', '법', 
+                               '선거', '정부', '국회', '대통령', '시장', '주식', '부동산', 
+                               '금융', '투자', '인플레이션', '금리', '환율', '무역', '산업',
+                               '코로나', '백신', '의료', '교육', '환경', '기후', '에너지',
+                               '북한', '중국', '미국', '일본', '러시아', '우크라이나',
+                               '분석', '전망', '동향', '트렌드', '현황', '문제', '해결',
+                               '정책변화', '시장영향', '경제정책', '사회현상', '국정감사',
+                               '정치분석', '경제분석', '사회분석', '국제정세', '외교',
+                               'news', 'politics', 'economy', 'social', 'international',
+                               'policy', 'market', 'analysis', 'trend']
+                
+                # 시사 템플릿 선택 (우선순위 높음)
+                if any(keyword in topic_lower for keyword in news_keywords):
+                    for template in templates:
+                        if '시사' in template.name or 'news' in template.name.lower() or '정보전달' in template.name:
+                            selected_template = template
+                            print(f"DEBUG: Selected news template: {template.name}")
+                            break
+                
+                # 여행 템플릿 선택
+                elif any(keyword in topic_lower for keyword in travel_keywords):
+                    for template in templates:
+                        if '여행' in template.name or 'travel' in template.name.lower():
+                            selected_template = template
+                            print(f"DEBUG: Selected travel template: {template.name}")
+                            break
+                
+                # 요리/음식 관련 주제는 템플릿 사용하지 않음
+                cooking_keywords = ['요리', '음식', '레시피', '만들기', '조리법', '파스타', 
+                                  '라면', '김치', '찌개', '국', '밥', '반찬', '디저트', 
+                                  '케이크', '빵', 'cooking', 'recipe', 'food']
+                
+                if any(keyword in topic_lower for keyword in cooking_keywords):
+                    print(f"DEBUG: Cooking topic detected, no template will be used")
+                    selected_template = None
+                
+                # 템플릿이 선택되지 않고 요리 주제가 아니면서 활성 템플릿이 있으면 사용 안함
+                # (기본 가이던스 시스템 사용하도록)
+                
+                if selected_template:
+                    import json
+                    steps = json.loads(selected_template.steps)
+                    # Use the first step's prompt template
+                    if steps and len(steps) > 0:
+                        return steps[0].get('prompt_template', '')
+            
+            return ""
+        except Exception as e:
+            print(f"DEBUG: Failed to get workflow template: {e}")
+            return ""
+
+    def _get_guidance(self, topic: str, guidance_data: dict) -> str:
+        """Get appropriate guidance for the topic."""
+        category = self._categorize_topic(topic)
+        is_comparison, ranking_number = self._detect_topic_type(topic)
+        
+        # 특수 타입 처리
+        if is_comparison and 'fallback' in guidance_data and 'comparison' in guidance_data['fallback']:
+            fallback_data = guidance_data['fallback']['comparison']
+            return f"{fallback_data['icon']} {fallback_data['guidance']}"
+        
+        if ranking_number and 'fallback' in guidance_data and 'ranking' in guidance_data['fallback']:
+            fallback_data = guidance_data['fallback']['ranking']
+            return f"{fallback_data['icon']} {fallback_data['guidance']}"
+        
+        # 카테고리별 가이던스
+        if category in guidance_data:
+            category_data = guidance_data[category]
+            return f"{category_data['icon']} {category_data['guidance']}"
+        
+        # 기본 fallback
+        if 'fallback' in guidance_data and 'default' in guidance_data['fallback']:
+            fallback_data = guidance_data['fallback']['default']
+            return f"{fallback_data['icon']} {fallback_data['guidance']}"
+        
+        # 하드코딩된 최종 fallback
+        return """🎯 Universal Guidance:
+- 주제의 핵심 가치 및 중요성 설명
+- 단계별 접근법 (입문 → 중급 → 전문가)
+- 실용적 팁과 주의사항
+- 다양한 관점에서의 분석
+- 실제 적용 사례 및 경험담"""
     
     def save_job_status(self, job_id: str, response: GenerationResponse) -> None:
         """Save job status to database."""
@@ -81,6 +317,7 @@ class ContentGenerator:
     
     def get_job_result(self, job_id: str) -> GenerationResponse:
         """Get job result from database."""
+        print(f"DEBUG: Starting get_job_result for {job_id}")
         db_job = self.db.get_generation_job(job_id)
         if not db_job:
             raise FileNotFoundError(f"Job {job_id} not found")
@@ -131,7 +368,7 @@ class ContentGenerator:
                 )
         
         try:
-            print(f"DEBUG: db_job.tone = {self.safe_print_str(str(db_job.tone))}")
+            print(f"DEBUG: db_job.tone = {safe_print(str(db_job.tone))}")
         except UnicodeEncodeError:
             print("DEBUG: db_job.tone contains Unicode characters")
         try:
@@ -153,7 +390,7 @@ class ContentGenerator:
         )
         
         try:
-            print(f"DEBUG: response.tone = {self.safe_print_str(str(response.tone))}")
+            print(f"DEBUG: response.tone = {safe_print(str(response.tone))}")
         except UnicodeEncodeError:
             print("DEBUG: response.tone contains Unicode characters")
         try:
@@ -535,365 +772,126 @@ class ContentGenerator:
             return ""
     
     def _create_system_prompt(self, request: GenerationRequest) -> str:
-        """Create system prompt for AI."""
+        """Create system prompt for AI using guidance-based approach and workflow templates."""
+        
+        # 언어 설정
         language_instruction = ""
         if request.target_language == "ko":
             language_instruction = "모든 응답은 한국어로 작성해주세요."
         elif request.target_language == "en":
             language_instruction = "Please respond in English."
         
-        # Load template structure
-        template_structure = self._load_template_structure()
-        
-        # Detect comparison topics
-        is_comparison_topic = any(keyword in request.topic.lower() for keyword in ['vs', 'versus', '대', '비교', '차이'])
-        
-        # Detect TOP/ranking topics and extract number
-        import re
-        topic_lower = request.topic.lower()
-        ranking_number = None
-        is_ranking_topic = False
-        
-        # Check for TOP patterns
-        top_patterns = [
-            r'top\s*(\d+)', r'톱\s*(\d+)', r'베스트\s*(\d+)', r'best\s*(\d+)', 
-            r'추천\s*(\d+)', r'(\d+)가지', r'(\d+)개', r'(\d+)종류', 
-            r'(\d+)위', r'(\d+)순위'
-        ]
-        
-        for pattern in top_patterns:
-            match = re.search(pattern, topic_lower)
-            if match:
-                ranking_number = int(match.group(1))
-                is_ranking_topic = True
-                break
-        
-        # Also check for written numbers in Korean
-        korean_numbers = {
-            '세': 3, '삼': 3, '네': 4, '사': 4, '다섯': 5, '오': 5,
-            '여섯': 6, '육': 6, '일곱': 7, '칠': 7, '여덟': 8, '팔': 8,
-            '아홉': 9, '구': 9, '열': 10
-        }
-        
-        for korean_num, num_val in korean_numbers.items():
-            if korean_num in topic_lower and ('가지' in topic_lower or '개' in topic_lower):
-                ranking_number = num_val
-                is_ranking_topic = True
-                break
-        
-        comparison_instruction = ""
-        top3_instruction = ""
-        
-        # Detect choice/selection topics as well
-        choice_patterns = [
-            r'(\d+)\s*가지', r'(\d+)\s*개', r'(\d+)\s*종류', r'(\d+)\s*유형', 
-            r'(\d+)\s*방법', r'(\d+)\s*선택', r'(\d+)\s*옵션'
-        ]
-        
-        choice_number = None
-        is_choice_topic = False
-        
-        for pattern in choice_patterns:
-            match = re.search(pattern, topic_lower)
-            if match:
-                choice_number = int(match.group(1))
-                is_choice_topic = True
-                break
-        
-        # Use either ranking_number or choice_number
-        final_number = ranking_number if is_ranking_topic else choice_number
-        is_multi_item_topic = is_ranking_topic or is_choice_topic
+        # 워크플로우 템플릿 확인 (ID 우선, 그 다음 주제를 기반으로 적절한 템플릿 선택)
+        workflow_template = self._get_workflow_template(request.topic, template_id=request.workflow_template_id)
+        if workflow_template:
+            # 워크플로우 템플릿이 있으면 {topic}을 실제 주제로 교체
+            template_prompt = workflow_template.replace('{topic}', request.topic)
+            return f"""
+{language_instruction}
 
-        # TOP/Ranking/Choice topic instructions
-        if is_multi_item_topic and final_number:
-            # Generate emoji list for rankings
-            ranking_emojis = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
-            section_examples = []
-            
-            for i in range(final_number):
-                rank_num = i + 1
-                emoji = ranking_emojis[i] if i < len(ranking_emojis) else f"{rank_num}️⃣"
-                if is_ranking_topic:
-                    section_examples.append(f"  * ## {emoji} {rank_num}위 (또는 TOP{rank_num}): [항목명] - 매우 상세한 설명 (4-5문단)")
-                else:
-                    section_examples.append(f"  * ## {emoji} 선택 {rank_num}: [항목명] - 매우 상세한 설명 (4-5문단)")
-            
-            section_structure = '\n'.join(section_examples)
-            
-            topic_type = "TOP" if is_ranking_topic else "선택"
-            
-            top3_instruction = f"""
-**🏆 {topic_type}{final_number}/다중항목 주제 특별 요구사항 (절대 필수):**
-주제 "{request.topic}"는 {final_number}개 항목을 다루는 주제입니다. 반드시 다음을 지켜주세요:
+당신은 전문 콘텐츠 작성자입니다. 아래 템플릿에 따라 고품질 콘텐츠를 작성해주세요:
 
-**📊 구조 요구사항 (매우 중요):**
-- **정확히 {final_number}개의 항목**을 다뤄야 합니다 (명시된 숫자와 정확히 일치)
-- **각 항목별로 독립된 큰 섹션** 구성: 
-{section_structure}
-- **각 항목마다 최소 400-600단어** 할당하여 매우 상세하게 작성
-- **전체 {final_number}개 항목이 균등한 분량**으로 작성 (어느 하나도 빠뜨리거나 짧게 쓰지 말 것)
-- **모든 항목에 동일한 구조** 적용: 개요 → 특징 → 장단점 → 사용법/방법 → 추천상황
+{template_prompt}
 
-**📋 필수 테이블 (반드시 포함):**
-- **종합 비교표**: {final_number}개 항목의 특징, 장단점, 점수를 한눈에 비교
-- **선택 가이드표**: 상황별/목적별로 어떤 항목을 선택해야 하는지 상세 가이드  
-- **케이스별 추천표**: 다양한 상황에서의 추천 항목과 이유
-- **항목별 상세 정보표**: 각 항목의 핵심 정보를 정리한 표
+톤: {request.tone}
+분량: 약 {request.word_count}단어
+대상 언어: {request.target_language}
 
-**🚨 테이블 완성도 필수 사항 🚨:**
-- 모든 테이블은 반드시 완전한 HTML 구조로 생성 (opening과 closing 태그 모두 필수)
-- 각 테이블은 최소 3-5개의 완전한 행(row)을 포함해야 함
-- 테이블이 중간에 잘리거나 불완전하게 끝나면 안됨
-- `<table>` 태그로 시작했으면 반드시 `</table>` 태그로 완료
-- 모든 `<tr>` 태그는 반드시 `</tr>`로 완료
-- 모든 `<td>`와 `<th>` 태그는 반드시 완전히 닫혀야 함
-
-**✅ 각 항목별 필수 내용:**
-- **선정 이유** (왜 이 항목인지)
-- **핵심 특징 및 장점** (구체적 예시 포함)
-- **단점 및 한계사항** (솔직한 평가)
-- **구체적 사용 사례/활용법** (실제 예시)
-- **추천 대상 및 상황** (언제, 누구에게)
-- **실제 후기/평가 정보** (가능한 경우)
-
-**⚠️ 절대 준수 사항:**
-- {final_number}개 항목 **모두 반드시 포함** (하나도 빠뜨리면 안됨)
-- 모든 항목이 **동일한 깊이와 상세함**으로 작성 (균등 분배)
-- 각 섹션은 **큰 덩어리로 구성** (작은 카드들로 쪼개지 말고 항목1 전체, 항목2 전체, 항목3 전체로)
-- **케이스별 추천 섹션** 반드시 포함 (어떤 상황에서 어떤 선택을 해야 하는지)
-
+추가 요구사항:
+- SEO 최적화된 제목과 부제목 사용
+- 독자의 관심을 끄는 도입부
+- 명확하고 실용적인 정보 제공
+- 자연스러운 결론과 다음 단계 안내
 """
         
-        if is_comparison_topic:
-            comparison_instruction = f"""
-**🔥 비교 주제 특별 요구사항 (절대 필수):**
+        # 워크플로우 템플릿이 없으면 기존 가이던스 시스템 사용
+        # 가이던스 데이터 로드
+        guidance_data = self._load_guidance()
+        
+        # 주제별 가이던스 가져오기
+        topic_guidance = self._get_guidance(request.topic, guidance_data)
+        
+        # 주제 타입 감지 (비교, 랭킹)
+        is_comparison, ranking_number = self._detect_topic_type(request.topic)
+        
+        # 특수 처리를 위한 추가 지시사항
+        special_instructions = ""
+        
+        if is_comparison:
+            special_instructions += f"""
+**🔥 비교 주제 특별 처리:**
 주제 "{request.topic}"는 비교 주제입니다.
-- 반드시 양쪽 모두 동등하게 다뤄야 합니다 (예: 동부힙합 + 서부힙합 모두)
-- 각 측면별로 최소 3-4개 섹션씩 할당
-- 직접 비교하는 상세 비교표 최소 3개 필수 (매우 중요!)
-- 장단점, 특징, 차이점을 명확히 대비
-- 어느 한쪽에 편향되지 않고 균형잡힌 시각으로 작성
-- 결론에서 상황별 선택 가이드 제공
-
-**비교표 필수 항목 (반드시 HTML <table> 태그 사용):**
-1. 기본 특징 비교표 - <table><thead><tr><th>구분</th><th>A측면</th><th>B측면</th></tr></thead><tbody>...
-2. 장단점 비교표 - <table><thead><tr><th>항목</th><th>A측면 장점</th><th>A측면 단점</th><th>B측면 장점</th><th>B측면 단점</th></tr></thead>...
-3. 추천 상황별 비교표 - <table><thead><tr><th>상황</th><th>A측면 추천도</th><th>B측면 추천도</th><th>이유</th></tr></thead>...
-
-**테이블 스타일링 필수 (더 아름다운 디자인):**
-모든 <table>에 style="border-collapse: collapse; width: 100%; margin: 25px 0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" 적용
-<thead> <tr>에 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;" 적용
-모든 <th>에 style="padding: 15px 20px; text-align: left; font-weight: 600; border: none;" 적용
-모든 <td>에 style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;" 적용
-<tbody> <tr>에 style="transition: background-color 0.3s ease;" 적용
-<tbody> <tr>:nth-child(even)에 style="background-color: #f8f9ff;" 적용
+- 양쪽 모두 동등하게 다뤄야 합니다
+- 비교표 최소 2개 필수 포함
+- 장단점을 명확히 대비
+- 상황별 선택 가이드 제공
 """
         
+        if ranking_number:
+            ranking_emojis = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+            special_instructions += f"""
+**🏆 랭킹/TOP 주제 특별 처리:**
+주제 "{request.topic}"는 {ranking_number}개 항목을 다루는 주제입니다.
+- 정확히 {ranking_number}개 항목 포함
+- 각 항목마다 순위별 이모지 사용: {', '.join(ranking_emojis[:ranking_number])}
+- 모든 항목이 균등한 분량으로 작성
+- 순위별 비교표 포함
+"""
+        
+        # 이미지 지시사항
         image_instructions = ""
         if request.include_images:
-            # Generate image instructions based on the number of items
-            image_count = final_number if is_multi_item_topic and final_number else 5
-            image_list = []
-            
-            for i in range(image_count):
-                image_num = i + 1
-                if is_multi_item_topic:
-                    image_list.append(f"""        {{
-            "url": "item_{image_num}_image",
-            "alt": "{image_num}번째 선택/항목과 관련된 구체적인 이미지 설명",
-            "caption": "{image_num}번째 항목 관련 이미지"
-        }}""")
-                else:
-                    image_list.append(f"""        {{
-            "url": "section_specific_image_{image_num}",
-            "alt": "{image_num}번째 주요 섹션과 관련된 구체적인 이미지 설명",
-            "caption": "{image_num}번째 섹션 제목에 맞는 이미지 캡션"
-        }}""")
-            
-            images_json = ',\n'.join(image_list)
-            image_instructions = f"""    "images": [
-{images_json}
-    ],"""
-        else:
-            image_instructions = """    "images": [],"""
-        
-        template_instruction = ""
-        if template_structure:
-            template_instruction = f"""
-**템플릿 구조 (반드시 적용):**
-{template_structure}
-
-위 구조를 참고하여 동일한 패턴으로 작성하세요.
+            image_count = ranking_number if ranking_number else 5
+            image_instructions = f"""
+**📷 이미지 포함 지시사항:**
+- 총 {image_count}개의 관련 이미지 포함
+- 각 주요 섹션마다 적절한 이미지 배치
+- 이미지 alt text와 caption 상세 작성
 """
         
-        return f"""당신은 한국어 여행/마일리지 전문 에디터입니다.
-
-{comparison_instruction}
-
-{top3_instruction}
-
-{template_instruction}
-
-**🎯 제목 생성 규칙 (매우 중요):**
-- 창의적이고 감각적인 제목 필수: "집에서도 맛집 김치찌개! 황금 레시피 대공개"
-- 흥미를 끄는 표현: "놓치면 후회하는", "진짜 알아야 할", "숨겨진 비밀", "완벽한 공략법"
-- 구체적 혜택 강조: "5분만에 완성", "비용 50% 절약", "실패 없는 방법"
-- 감정적 호소: "이제 걱정 끝!", "드디어 찾았다", "정말 쉬워요"
-
-**📝 콘텐츠 품질 기준:**
-- 각 소제목마다 최소 3-4개 문단 작성 (문단당 최소 150자 이상)
-- 구체적 사례, 수치, 단계별 설명으로 내용 풍부하게 작성
-- 실무에 바로 활용 가능한 상세한 정보 포함
-- 표와 리스트를 활용하여 정보를 체계적으로 정리
-- **오직 실용적이고 현재 유용한 정보만 포함**
-
-**📊 테이블 생성 필수 규칙 (매우 중요):**
-- 비교 정보가 있으면 반드시 비교표 작성 (장단점, 가격, 특징, 차이점 등)
-- 단계별 과정은 단계표로 정리 (절차, 순서, 방법 등)  
-- 수치/통계 데이터는 데이터표로 작성 (요금, 시간, 비용, 성과 등)
-- 분류 정보는 분류표로 정리 (유형, 종류, 카테고리 등)
-- **케이스별 추천표 필수**: 상황/목적별로 어떤 선택을 해야 하는지 상세 표 작성
-- 각 주요 섹션마다 최소 1개 이상의 테이블 포함 필수
-- 전체 글에서 최소 6-8개의 테이블 필수 포함 (케이스별 추천표 포함)
-- 테이블은 정보 전달의 핵심 수단으로 활용
-
-**📋 요약박스 생성 필수 규칙:**
-- **글의 마지막 부분에 요약박스 필수 포함**
-- 요약박스 내용: 핵심 포인트 3-5개, 최종 추천사항, 주의사항
-- 요약박스 디자인: 눈에 띄는 스타일로 별도 박스 처리
-- "📋 핵심 요약" 또는 "💡 정리하면" 등의 제목 사용 
-
-**작성 원칙:**
-- {request.word_count}단어 분량 (HTML 태그 제외)
-- 테이블 5-7개 이상 포함 (필수){"" if not is_comparison_topic else " - 비교 주제는 비교표 최소 3개 필수"}
-- 브런치 포맷: H2/H3 섹션 구성
-- 톤: {request.tone}
-- 언어: {request.target_language}
+        return f"""당신은 전문적이고 신뢰할 수 있는 콘텐츠 작성자입니다.
 
 {language_instruction}
 
-**🚨 중요: JSON 형식 준수 🚨**
-응답은 반드시 유효한 JSON 구조로 제공해주세요. HTML 속성의 따옴표는 반드시 \" 로 이스케이프해야 합니다.
+**🎯 주제별 특별 가이던스:**
+{topic_guidance}
 
-응답 형식:
-{{
-    "title": "창의적이고 매력적인 제목",
-    "html_content": "완전한 HTML 콘텐츠 (모든 HTML 속성의 따옴표는 반드시 \\\"로 이스케이프)",
-    "markdown_content": "체계적 구조의 마크다운 콘텐츠", 
-    "summary": "2-3문장의 핵심 요약",
-    "tags": ["실무", "가이드", "관련주제"],
+{special_instructions}
+
 {image_instructions}
+
+**📝 기본 작성 원칙:**
+- 독자에게 실질적 도움이 되는 내용 작성
+- 정확하고 신뢰할 수 있는 정보 제공
+- 브런치 스타일의 깔끔하고 읽기 쉬운 구조
+- 적절한 HTML 스타일링으로 시각적 완성도 제고
+- 목표 단어수({request.word_count}단어) 준수
+
+**🚨 필수 준수사항:**
+- 모든 내용은 사실에 기반하여 작성
+- 편향되지 않은 균형잡힌 시각 유지
+- 실용적이고 actionable한 조언 포함
+- 독자의 다양한 상황과 needs 고려
+
+**출력 형식:**
+반드시 JSON 형태로 응답하되, 다음 구조를 따라주세요:
+{{
+    "title": "흥미롭고 구체적인 제목",
+    "html_content": "완전한 HTML 형태의 본문 내용",
+    "summary": "핵심 내용을 담은 2-3문장 요약",
+    "tags": ["관련태그1", "관련태그2", "관련태그3"]
 }}
 
-**JSON 작성 규칙:**
-- HTML 속성의 모든 따옴표는 \" 형태로 이스케이프 필수
-- 예시: "html_content": "<h1 style=\\"color: #000\\">제목</h1>"
-- 줄바꿈은 \\n으로 표현
-- 백슬래시는 \\\\로 이스케이프
+**HTML 스타일링 지침:**
+- 메인 제목: 중앙 정렬, 그라데이션 배경
+- 섹션 제목: 눈에 띄는 색상과 적절한 여백
+- 본문: 읽기 쉬운 폰트와 줄간격
+- 강조: 배경색을 활용한 하이라이트
+- 테이블: 깔끔한 헤더와 구분선
+- 절대 흰색(#ffffff, #fff, white) 텍스트 금지
 
-**🎨 HTML 스타일 참고** (JSON에 넣을 때는 반드시 따옴표 이스케이프!):
-- **메인 제목**: <h1 style="color: #2c3e50; font-size: 2.8em; font-weight: 800; margin-bottom: 0.8em; line-height: 1.2; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">창의적인 제목</h1>
-- **도입부**: <div style="color: #2c3e50; font-size: 1.2em; line-height: 1.9; margin-bottom: 3em; background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 50%, #ffeaa7 100%); padding: 30px; border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(10px); position: relative; overflow: hidden;">
-    <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); pointer-events: none;"></div>
-    <div style="position: relative; z-index: 1;">✨ 인트로 내용</div>
-</div>
-- **섹션 제목**: <h2 style="color: #2c3e50; font-size: 2.1em; font-weight: 700; margin-top: 3.5em; margin-bottom: 1.5em; background: linear-gradient(135deg, #74b9ff 0%, #0984e3 50%, #6c5ce7 100%); padding: 20px 30px; border-radius: 15px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); text-align: center; color: white; transform: perspective(1000px) rotateX(5deg); transition: all 0.3s ease;">🎯 섹션제목</h2>
-- **이미지 삽입**: <img src="이미지URL" alt="설명" style="width: 100%; max-width: 700px; height: auto; margin: 2em auto; display: block; border-radius: 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.2); border: 4px solid white; filter: brightness(1.05) contrast(1.1);">
-- **본문**: <p style="color: #2c3e50; line-height: 1.9; font-size: 17px; margin-bottom: 2em; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 25px; border-radius: 12px; border-left: 6px solid #74b9ff; box-shadow: 0 4px 16px rgba(0,0,0,0.08); font-weight: 400;">상세한 본문 내용</p>
-- **강조**: <strong style="color: white; font-weight: 700; background: linear-gradient(135deg, #e17055 0%, #d63031 50%, #e84393 100%); padding: 4px 10px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">중요한 내용</strong>
-- **리스트**: <ul style="color: #2c3e50; margin: 2em 0; padding: 25px; background: linear-gradient(135deg, #ddd6fe 0%, #c084fc 20%, #e879f9 100%); border-radius: 15px; box-shadow: 0 6px 24px rgba(0,0,0,0.12); list-style: none;"><li style="margin-bottom: 1em; line-height: 1.7; background: white; padding: 15px 20px; border-radius: 10px; margin: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #74b9ff; font-weight: 500; transition: all 0.3s ease;">🔹 항목: 상세 설명</li></ul>
-- **테이블**: <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin: 2em 0; border-radius: 15px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.15); background: white;"><thead><tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);"><th style="border: none; padding: 20px; text-align: center; font-weight: 700; color: white; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">항목</th><th style="border: none; padding: 20px; text-align: center; font-weight: 700; color: white; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">기준</th><th style="border: none; padding: 20px; text-align: center; font-weight: 700; color: white; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">혜택</th></tr></thead><tbody><tr style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);"><td style="border: none; padding: 18px; color: #2c3e50; text-align: center; border-bottom: 1px solid rgba(0,0,0,0.05); font-weight: 500;">내용</td></tr></tbody></table>
-- **팁 박스**: <div style="background: linear-gradient(135deg, #fdcb6e 0%, #e17055 50%, #fd79a8 100%); border: none; padding: 25px; margin: 2.5em 0; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); position: relative; overflow: hidden;">
-    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%); pointer-events: none;"></div>
-    <p style="color: white; margin: 0; font-style: italic; font-weight: 600; font-size: 16px; position: relative; z-index: 1; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">💡 실전 팁: 구체적인 조언</p>
-</div>
-- **구분선**: <hr style="border: none; height: 4px; background: linear-gradient(90deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #667eea 75%, #764ba2 100%); margin: 4em 0; border-radius: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-- **주의사항**: <span style="color: white; font-weight: 700; background: linear-gradient(135deg, #ff6b6b 0%, #feca57 50%, #ff9ff3 100%); padding: 12px 20px; border-radius: 25px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); display: inline-block; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px;">⚠️ 주의사항</span>
-- **카드 박스**: <div style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); padding: 30px; margin: 25px 0; border-radius: 20px; box-shadow: 0 12px 48px rgba(0,0,0,0.12); border: 1px solid rgba(0,0,0,0.05); backdrop-filter: blur(10px); position: relative; overflow: hidden;">
-    <div style="position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; background: linear-gradient(135deg, #667eea, #764ba2, #f093fb); border-radius: 22px; z-index: -1;"></div>
-    카드 내용
-</div>
-- **링크 버튼**: <div style="text-align: center; margin: 25px 0;"><a href="#" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); color: white; text-decoration: none; font-weight: 700; font-size: 15px; padding: 15px 30px; border-radius: 50px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); transform: translateY(0); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-transform: uppercase; letter-spacing: 1px; position: relative; overflow: hidden;">
-    <span style="position: relative; z-index: 1;">버튼 텍스트</span>
-    <div style="position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); transition: all 0.5s;"></div>
-</a></div>
-- **요약박스**: <div style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 50%, #6c5ce7 100%); padding: 35px; margin: 3em 0; border-radius: 25px; box-shadow: 0 15px 50px rgba(0,0,0,0.2); border: 3px solid rgba(255,255,255,0.1); position: relative; overflow: hidden;">
-    <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%); pointer-events: none;"></div>
-    <h3 style="color: white; margin: 0 0 25px 0; font-size: 1.6em; font-weight: 800; text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.3); position: relative; z-index: 1;">📋 핵심 요약</h3>
-    <div style="color: white; line-height: 1.8; font-size: 16px; font-weight: 500; position: relative; z-index: 1; text-shadow: 0 1px 3px rgba(0,0,0,0.2);">요약 내용</div>
-</div>
-
-**중요: 절대 흰색(#ffffff, #fff, white) 또는 매우 밝은 색상을 사용하지 마세요.**
-
-마크다운 작성 규칙 (브런치 스타일):
-- 제목: # 메인 제목
-- 인트로를 위한 구분: > 인트로 내용 (인용문으로 표현)
-- 부제목: ## 부제목  
-- 소제목: ### 소제목
-- 본문: 일반 텍스트 (줄바꿈 두 번으로 문단 구분)
-- 강조: **강조 텍스트**
-- 리스트: - 항목 또는 1. 번호 항목
-- 표 형식: | 제목1 | 제목2 | 제목3 | (마크다운 테이블 문법 사용)
-- 팁/정보: > 💡 **유용한 팁**: 팁 내용
-- 관련 링크: [소제목](#) (버튼 형태로 표현)
-
-**목표 단어 수({request.word_count}단어)에 정확히 맞춰 작성하되, 브런치 스타일의 깔끔하고 체계적인 구조를 유지하세요.**
-
-**⚠️ 필수사항: 각 섹션마다 관련페이지로 이동할 수 있는 링크를 반드시 포함해야 합니다!**"""
+토픽: "{request.topic}"에 대해 위 가이드라인에 따라 {request.word_count}단어 분량의 전문적인 콘텐츠를 작성해주세요."""
     
-    def _create_user_prompt(self, request: GenerationRequest) -> str:
-        """Create user prompt for AI."""
-        image_instructions = ""
-        if request.include_images:
-            image_instructions = "3. **섹션별 관련 이미지**: 각 주요 섹션 제목에 직접 관련된 구체적인 이미지 3-5개 포함 (예: '대한항공' 섹션 → 대한항공/항공기 이미지)\n"
-        
-        # Calculate target range - use 10% margin as requested
-        margin = max(200, int(request.word_count * 0.1))  # 10% or minimum 200 words
-        min_words = request.word_count - margin
-        max_words = request.word_count + margin
-        
-        word_count_instruction = f"""1. **🚨 절대적 단어수 준수 🚨**: HTML 태그를 완전히 제외한 순수 텍스트가 반드시 {min_words}-{max_words}단어 사이여야 합니다.
-   
-   ⚠️ 중요 계산 방식:
-   - 목표 단어수: {request.word_count}단어
-   - 허용 범위: {min_words}단어 ~ {max_words}단어 (±{margin}단어)
-   - HTML 태그는 단어수에 포함되지 않습니다
-   - <p>, <h1>, <div> 등 모든 태그 제외하고 순수 텍스트만 계산
-   
-   📝 작성 전략 (절대 준수):
-   - 현재 {request.word_count}단어는 상당히 긴 분량입니다 - 반드시 이 분량을 채워야 합니다
-   - 각 섹션을 매우 상세하고 길게 작성하세요 (섹션당 최소 150-200단어)
-   - 구체적 예시, 상세한 설명, 실무 팁을 풍부하게 추가
-   - 8-12개 정도의 상세한 섹션으로 구성 
-   - 단어수가 부족하면 반드시 더 많은 내용 추가
-   - 모든 문단은 최소 3-4문장 이상으로 구성
-   - 나열형 설명보다는 서술형 상세 설명 위주로 작성
-   - 반드시 {min_words}단어 이상 작성 - 이것은 절대 기준입니다!"""
-            
-        important_points = f"""{word_count_instruction}
-2. HTML 버전과 마크다운 버전 모두 제공하세요
-{image_instructions}
-4. **인라인 텍스트 링크 필수**: 콘텐츠 내용 중에 구체적인 장소, 서비스, 앱 언급 시 반드시 "(https://...)" 형태로 링크 추가
-   - 스탠리 파크 언급 시: "스탠리 파크(https://vancouver.ca/parks-recreation-culture/stanley-park.aspx)"
-   - 환전 서비스: "환전하기(https://wise.com/kr/currency-converter/cad-to-krw-rate)"  
-   - 교통 앱: "TransLink(https://www.translink.ca/)" + "Uber(https://www.uber.com/)"
-   - 관광명소: 각 명소의 공식 홈페이지 링크
-   - 교통수단: 공식 교통기관 사이트 링크
-   - 예약 사이트: 공식 예약 서비스 링크
-5. HTML에는 인라인 스타일을 적용하세요
-6. **모든 텍스트는 검정색(#000000)을 기본으로 사용하세요** - 제목, 부제목, 소제목, 본문 모두 검정색
-7. **오직 강조 부분만 색상 사용**: 중요한 키워드나 강조 텍스트에만 색상을 적용하세요
-8. 완전한 HTML 구조로 작성하여 웹페이지에 바로 표시 가능하게 만드세요
-9. 절대 흰색(#ffffff, #fff, white)이나 매우 밝은 색상은 사용하지 마세요
-10. **섹션별 링크 금지**: 섹션 제목 뒤에 "자세히 보기", "바로가기" 등의 별도 링크 버튼을 만들지 마세요. 오직 인라인 링크만 사용
-11. **절대 Google 검색 링크 금지**: 어떤 경우에도 google.com/search 형태의 링크를 만들지 마세요
-12. **링크 생성 전면 금지**: 섹션별 링크, 외부 링크, 참조 링크 등 모든 <a> 태그 링크 생성을 하지 마세요
-
-**🔥 추가 필수 요구사항 (절대 준수):**
-13. **케이스별 추천표 반드시 포함**: 다양한 상황/목적에 따른 추천 항목을 표로 정리
-14. **요약박스 필수**: 글의 마지막에 핵심 내용을 정리한 요약박스를 반드시 포함하세요
-15. **이미지는 실제 img 태그로 생성**: 텍스트 설명이 아닌 실제 <img> 태그를 사용하세요
-16. **다중 항목 주제의 경우**: 명시된 숫자만큼 정확히 모든 선택지/항목을 다뤄야 합니다"""
 
     def _get_tone_specific_guidelines(self, tone: str) -> str:
         """Get tone-specific content guidelines to avoid inappropriate content."""
@@ -1347,7 +1345,37 @@ class ContentGenerator:
             
             if start_idx != -1 and end_idx > start_idx:
                 json_str = content[start_idx:end_idx]
-                data = json.loads(json_str)
+                
+                # Parse JSON - handle encoding issues gracefully
+                try:
+                    data = json.loads(json_str)
+                    print(f"DEBUG: JSON parsing successful")
+                except json.JSONDecodeError as e:
+                    print(f"DEBUG: Initial JSON parsing failed: {e}")
+                    
+                    # Try to fix potential encoding issues in the JSON string
+                    try:
+                        # First, ensure we have proper string encoding
+                        if isinstance(json_str, str):
+                            # Try to encode/decode to fix any encoding issues
+                            json_bytes = json_str.encode('utf-8', errors='ignore')
+                            fixed_json_str = json_bytes.decode('utf-8', errors='ignore')
+                            data = json.loads(fixed_json_str)
+                            print(f"DEBUG: JSON parsing successful after UTF-8 cleanup")
+                        else:
+                            raise e
+                    except json.JSONDecodeError:
+                        print(f"DEBUG: JSON parsing failed even after encoding fixes")
+                        print(f"DEBUG: Problematic JSON (first 300 chars): {repr(json_str[:300])}")
+                        # Fall back to creating basic content structure
+                        data = {
+                            "title": f"Content about {request.topic}",
+                            "html_content": content,  # Use the raw content
+                            "summary": None,
+                            "tags": [],
+                            "images": []
+                        }
+                        print(f"DEBUG: Using fallback content structure")
                 
                 # Process images data - now ImageInfo is dict-based so should be safe
                 images_data = data.get("images", [])
@@ -1428,10 +1456,19 @@ class ContentGenerator:
                         nested_end = nested_content.rfind('}') + 1
                         if nested_start != -1 and nested_end > nested_start:
                             nested_json = nested_content[nested_start:nested_end]
-                            nested_data = json.loads(nested_json)
-                            # Use the html_content from the nested JSON
-                            main_content = nested_data.get("html_content", nested_data.get("content", main_content))
-                            print(f"DEBUG: Fixed nested JSON content, new length: {len(main_content)}")
+                            
+                            # Parse nested JSON directly
+                            try:
+                                nested_data = json.loads(nested_json)
+                                print(f"DEBUG: Nested JSON parsing successful")
+                            except json.JSONDecodeError as e:
+                                print(f"DEBUG: Nested JSON parsing failed: {e}")
+                                # If nested JSON parsing fails, skip nested processing
+                                nested_data = None
+                            # Use the html_content from the nested JSON if successful
+                            if nested_data:
+                                main_content = nested_data.get("html_content", nested_data.get("content", main_content))
+                                print(f"DEBUG: Fixed nested JSON content, new length: {len(main_content)}")
                     except Exception as e:
                         print(f"DEBUG: Failed to parse nested JSON: {e}")
                         # Keep original content if parsing fails

@@ -1,23 +1,68 @@
-import React from 'react'
-import { Row, Col, Card, Statistic, List, Badge, Typography, Space, Alert } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Row, Col, Card, Statistic, List, Badge, Typography, Space, Alert, Spin } from 'antd'
 import { TrophyOutlined, ClockCircleOutlined, DollarOutlined, ScheduleOutlined, ExclamationCircleOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
+import { API_BASE_URL } from '../../services/api'
 
 const { Title, Text } = Typography
 
-const AdminDashboard: React.FC = () => {
-  const recentActivities = [
-    { id: 1, action: '콘텐츠 생성 완료', user: 'user1', model: 'GPT-4', status: 'success', timestamp: '2분 전' },
-    { id: 2, action: '사용자 계정 생성', user: 'admin', target: 'newuser@company.com', status: 'success', timestamp: '15분 전' },
-    { id: 3, action: 'API 키 갱신', user: 'admin', provider: 'OpenAI', status: 'warning', timestamp: '1시간 전' },
-    { id: 4, action: '워크플로우 배포', user: 'editor1', workflow: 'SEO 최적화', status: 'success', timestamp: '2시간 전' },
-    { id: 5, action: '토큰 한도 초과', user: 'user2', model: 'Claude', status: 'error', timestamp: '3시간 전' },
-  ]
+interface DashboardStats {
+  today_count: number;
+  failed_count: number;
+  total_cost: number;
+  pending_count: number;
+  recent_activities: Array<{
+    id: string;
+    action: string;
+    user: string;
+    model: string;
+    status: string;
+    timestamp: string;
+  }>;
+  alerts: Array<{
+    type: string;
+    message: string;
+    action: string;
+  }>;
+}
 
-  const alerts = [
-    { type: 'warning', message: 'OpenAI API 키가 7일 후 만료됩니다', action: '키 갱신' },
-    { type: 'info', message: '3명의 사용자가 토큰 한도 80%에 도달했습니다', action: '한도 조정' },
-    { type: 'error', message: 'WordPress 연동에서 2건의 발행 실패가 발생했습니다', action: '연동 확인' },
-  ]
+const AdminDashboard: React.FC = () => {
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchDashboardStats()
+  }, [])
+
+  const fetchDashboardStats = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`${API_BASE_URL}/generation/dashboard/stats`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const data = await response.json()
+      if (data.error) {
+        throw new Error(data.error)
+      }
+      setStats(data)
+    } catch (err) {
+      console.error('Failed to fetch dashboard stats:', err)
+      setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다')
+      // Set default values on error
+      setStats({
+        today_count: 0,
+        failed_count: 0,
+        total_cost: 0,
+        pending_count: 0,
+        recent_activities: [],
+        alerts: []
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -28,17 +73,41 @@ const AdminDashboard: React.FC = () => {
     }
   }
 
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '50px' }}>
+        <Spin size="large" />
+        <div style={{ marginTop: 16 }}>대시보드 데이터를 불러오는 중...</div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <Title level={3}>시스템 대시보드</Title>
       <Text type="secondary">전체 시스템 상태와 활동을 모니터링합니다</Text>
+      
+      {error && (
+        <Alert
+          style={{ marginTop: 16 }}
+          message="데이터 로드 오류"
+          description={error}
+          type="warning"
+          showIcon
+          action={
+            <a onClick={fetchDashboardStats} style={{ fontSize: '12px' }}>
+              다시 시도
+            </a>
+          }
+        />
+      )}
 
       <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
         <Col span={6}>
           <Card>
             <Statistic
               title="오늘 생성 건수"
-              value={127}
+              value={stats?.today_count || 0}
               prefix={<TrophyOutlined />}
               valueStyle={{ color: '#3f8600' }}
               suffix="건"
@@ -49,7 +118,7 @@ const AdminDashboard: React.FC = () => {
           <Card>
             <Statistic
               title="실패/재시도"
-              value={8}
+              value={stats?.failed_count || 0}
               prefix={<ClockCircleOutlined />}
               valueStyle={{ color: '#cf1322' }}
               suffix="건"
@@ -60,10 +129,11 @@ const AdminDashboard: React.FC = () => {
           <Card>
             <Statistic
               title="토큰/비용"
-              value={2847.50}
+              value={stats?.total_cost || 0}
               prefix={<DollarOutlined />}
               valueStyle={{ color: '#722ed1' }}
               suffix="USD"
+              precision={2}
             />
           </Card>
         </Col>
@@ -71,7 +141,7 @@ const AdminDashboard: React.FC = () => {
           <Card>
             <Statistic
               title="예약 발행 대기"
-              value={15}
+              value={stats?.pending_count || 0}
               prefix={<ScheduleOutlined />}
               valueStyle={{ color: '#1890ff' }}
               suffix="건"
@@ -82,10 +152,13 @@ const AdminDashboard: React.FC = () => {
 
       <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
         <Col span={16}>
-          <Card title="최근 활동" extra={<a href="#">전체 로그 보기</a>}>
+          <Card title="최근 활동" extra={<a href="#" onClick={fetchDashboardStats}>새로고침</a>}>
             <List
               itemLayout="horizontal"
-              dataSource={recentActivities}
+              dataSource={stats?.recent_activities || []}
+              locale={{
+                emptyText: stats?.recent_activities?.length === 0 ? '최근 활동이 없습니다' : '데이터를 불러오는 중...'
+              }}
               renderItem={(item) => (
                 <List.Item>
                   <List.Item.Meta
@@ -101,10 +174,7 @@ const AdminDashboard: React.FC = () => {
                     description={
                       <Space>
                         <Text type="secondary">사용자: {item.user}</Text>
-                        {item.model && <Text type="secondary">모델: {item.model}</Text>}
-                        {item.target && <Text type="secondary">대상: {item.target}</Text>}
-                        {item.provider && <Text type="secondary">제공업체: {item.provider}</Text>}
-                        {item.workflow && <Text type="secondary">워크플로우: {item.workflow}</Text>}
+                        <Text type="secondary">모델: {item.model}</Text>
                         <Text type="secondary">{item.timestamp}</Text>
                       </Space>
                     }
@@ -117,20 +187,29 @@ const AdminDashboard: React.FC = () => {
         <Col span={8}>
           <Card title="알림 센터">
             <Space direction="vertical" style={{ width: '100%' }}>
-              {alerts.map((alert, index) => (
+              {stats?.alerts && stats.alerts.length > 0 ? (
+                stats.alerts.map((alert, index) => (
+                  <Alert
+                    key={index}
+                    message={alert.message}
+                    type={alert.type as any}
+                    action={
+                      <a href="#" style={{ fontSize: '12px' }}>
+                        {alert.action}
+                      </a>
+                    }
+                    closable
+                    showIcon
+                  />
+                ))
+              ) : (
                 <Alert
-                  key={index}
-                  message={alert.message}
-                  type={alert.type as any}
-                  action={
-                    <a href="#" style={{ fontSize: '12px' }}>
-                      {alert.action}
-                    </a>
-                  }
-                  closable
+                  message="현재 알림이 없습니다"
+                  type="success"
                   showIcon
+                  style={{ textAlign: 'center' }}
                 />
-              ))}
+              )}
             </Space>
           </Card>
         </Col>

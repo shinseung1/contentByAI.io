@@ -1,0 +1,17 @@
+=== KOREAN CHARACTER PRESERVATION TEST ===
+Original text: 인공지능 기술의 발전
+Korean chars in original: 9
+
+safe_print result: 인공지능 기술의 발전
+Korean chars in safe_print: 9
+remove_emojis result: 인공지능 기술의 발전
+Korean chars in remove_emojis: 9
+safe_print_str result: 인공지능 기술의 발전
+Korean chars in safe_print_str: 9
+
+RESULTS:
+safe_print preserves Korean: YES
+remove_emojis preserves Korean: YES
+safe_print_str preserves Korean: YES
+
+OVERALL: SUCCESS - All functions preserve Korean

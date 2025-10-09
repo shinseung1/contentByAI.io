@@ -50,6 +50,18 @@ class LoginSession:
     user_agent: Optional[str] = None
 
 @dataclass
+class WorkflowTemplate:
+    id: Optional[int] = None
+    name: str = ""
+    description: str = ""
+    steps: str = ""  # JSON string of workflow steps
+    version: str = "v1.0"
+    status: str = "active"  # active, inactive
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    created_by: Optional[int] = None
+
+@dataclass
 class GenerationJob:
     id: Optional[int] = None
     job_id: str = ""
@@ -190,6 +202,21 @@ class DatabaseManager:
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     last_accessed TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     access_count INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS workflow_templates (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    steps TEXT NOT NULL,
+                    version TEXT NOT NULL DEFAULT 'v1.0',
+                    status TEXT NOT NULL DEFAULT 'active',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    created_by INTEGER,
+                    FOREIGN KEY (created_by) REFERENCES users (id)
                 )
             """)
             
@@ -813,7 +840,7 @@ class DatabaseManager:
                 )
             """)
             
-            cursor = conn.execute("\"\"
+            cursor = conn.execute("""
                 INSERT INTO bundles (bundle_id, title, description, metadata, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (
@@ -860,7 +887,7 @@ class DatabaseManager:
             conn.execute("PRAGMA encoding = 'UTF-8'")
             conn.row_factory = sqlite3.Row
             
-            cursor = conn.execute("\"\"
+            cursor = conn.execute("""
                 SELECT * FROM bundles 
                 ORDER BY created_at DESC 
                 LIMIT ? OFFSET ?
@@ -911,7 +938,7 @@ class DatabaseManager:
                 params.append(datetime.now().isoformat())
                 params.append(bundle_id)
                 
-                query = f\"UPDATE bundles SET {', '.join(updates)} WHERE bundle_id = ?\"
+                query = f"UPDATE bundles SET {', '.join(updates)} WHERE bundle_id = ?"
                 cursor = conn.execute(query, params)
                 conn.commit()
                 return cursor.rowcount > 0
@@ -926,6 +953,242 @@ class DatabaseManager:
             cursor = conn.execute("DELETE FROM bundles WHERE bundle_id = ?", (bundle_id,))
             conn.commit()
             return cursor.rowcount > 0
+
+    # User management methods
+    def get_all_users(self) -> List[User]:
+        """모든 사용자 목록 조회"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            conn.row_factory = sqlite3.Row
+            
+            cursor = conn.execute("SELECT * FROM users ORDER BY created_at DESC")
+            users = []
+            for row in cursor.fetchall():
+                users.append(User(
+                    id=row['id'],
+                    username=row['username'],
+                    password_hash=row['password_hash'],
+                    email=row['email'],
+                    role=row['role'],
+                    is_active=bool(row['is_active']),
+                    created_at=row['created_at'],
+                    updated_at=row['updated_at'],
+                    expires_at=row['expires_at'],
+                    last_login=row['last_login'],
+                    login_attempts=row['login_attempts'],
+                    locked_until=row['locked_until']
+                ))
+            return users
+
+    def get_user_by_id(self, user_id: int) -> Optional[User]:
+        """ID로 사용자 조회"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            conn.row_factory = sqlite3.Row
+            
+            cursor = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+            row = cursor.fetchone()
+            
+            if row:
+                return User(
+                    id=row['id'],
+                    username=row['username'],
+                    password_hash=row['password_hash'],
+                    email=row['email'],
+                    role=row['role'],
+                    is_active=bool(row['is_active']),
+                    created_at=row['created_at'],
+                    updated_at=row['updated_at'],
+                    expires_at=row['expires_at'],
+                    last_login=row['last_login'],
+                    login_attempts=row['login_attempts'],
+                    locked_until=row['locked_until']
+                )
+            return None
+
+    def create_user_from_object(self, user: User) -> int:
+        """새 사용자 생성 (User 객체 버전)"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            cursor = conn.execute("""
+                INSERT INTO users (username, password_hash, email, role, is_active, created_at, updated_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                user.username,
+                user.password_hash,
+                user.email,
+                user.role,
+                user.is_active,
+                user.created_at,
+                user.updated_at,
+                user.expires_at
+            ))
+            conn.commit()
+            return cursor.lastrowid
+
+    def update_user(self, user: User) -> bool:
+        """사용자 정보 업데이트"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            cursor = conn.execute("""
+                UPDATE users 
+                SET username = ?, email = ?, role = ?, is_active = ?, 
+                    updated_at = ?, expires_at = ?
+                WHERE id = ?
+            """, (
+                user.username,
+                user.email,
+                user.role,
+                user.is_active,
+                user.updated_at,
+                user.expires_at,
+                user.id
+            ))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def delete_user(self, user_id: int) -> bool:
+        """사용자 삭제"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            # 관련 세션도 함께 삭제
+            conn.execute("DELETE FROM login_sessions WHERE user_id = ?", (user_id,))
+            cursor = conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    # Workflow template management methods
+    def get_all_workflow_templates(self) -> List[WorkflowTemplate]:
+        """모든 워크플로우 템플릿 조회"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            conn.row_factory = sqlite3.Row
+            
+            cursor = conn.execute("SELECT * FROM workflow_templates ORDER BY created_at DESC")
+            templates = []
+            for row in cursor.fetchall():
+                templates.append(WorkflowTemplate(
+                    id=row['id'],
+                    name=row['name'],
+                    description=row['description'],
+                    steps=row['steps'],
+                    version=row['version'],
+                    status=row['status'],
+                    created_at=row['created_at'],
+                    updated_at=row['updated_at'],
+                    created_by=row['created_by']
+                ))
+            return templates
+
+    def get_workflow_template_by_id(self, template_id: int) -> Optional[WorkflowTemplate]:
+        """ID로 워크플로우 템플릿 조회"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            conn.row_factory = sqlite3.Row
+            
+            cursor = conn.execute("SELECT * FROM workflow_templates WHERE id = ?", (template_id,))
+            row = cursor.fetchone()
+            
+            if row:
+                return WorkflowTemplate(
+                    id=row['id'],
+                    name=row['name'],
+                    description=row['description'],
+                    steps=row['steps'],
+                    version=row['version'],
+                    status=row['status'],
+                    created_at=row['created_at'],
+                    updated_at=row['updated_at'],
+                    created_by=row['created_by']
+                )
+            return None
+
+    def create_workflow_template(self, template: WorkflowTemplate) -> int:
+        """새 워크플로우 템플릿 생성"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            cursor = conn.execute("""
+                INSERT INTO workflow_templates (name, description, steps, version, status, created_at, updated_at, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                template.name,
+                template.description,
+                template.steps,
+                template.version,
+                template.status,
+                template.created_at,
+                template.updated_at,
+                template.created_by
+            ))
+            conn.commit()
+            return cursor.lastrowid
+
+    def update_workflow_template(self, template: WorkflowTemplate) -> bool:
+        """워크플로우 템플릿 업데이트"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            cursor = conn.execute("""
+                UPDATE workflow_templates 
+                SET name = ?, description = ?, steps = ?, version = ?, status = ?, updated_at = ?
+                WHERE id = ?
+            """, (
+                template.name,
+                template.description,
+                template.steps,
+                template.version,
+                template.status,
+                template.updated_at,
+                template.id
+            ))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def delete_workflow_template(self, template_id: int) -> bool:
+        """워크플로우 템플릿 삭제"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            cursor = conn.execute("DELETE FROM workflow_templates WHERE id = ?", (template_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def get_active_workflow_templates(self) -> List[WorkflowTemplate]:
+        """활성 워크플로우 템플릿만 조회"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            conn.row_factory = sqlite3.Row
+            
+            cursor = conn.execute("SELECT * FROM workflow_templates WHERE status = 'active' ORDER BY created_at DESC")
+            templates = []
+            for row in cursor.fetchall():
+                templates.append(WorkflowTemplate(
+                    id=row['id'],
+                    name=row['name'],
+                    description=row['description'],
+                    steps=row['steps'],
+                    version=row['version'],
+                    status=row['status'],
+                    created_at=row['created_at'],
+                    updated_at=row['updated_at'],
+                    created_by=row['created_by']
+                ))
+            return templates
 
 
 # 전역 데이터베이스 인스턴스
@@ -1001,6 +1264,128 @@ if __name__ == "__main__":
         
     except Exception as e:
         print(f"⚠️  사용자 생성 중 오류 (이미 존재할 수 있음): {e}")
+    
+    # 기본 워크플로우 템플릿 생성
+    try:
+        basic_blog_steps = [
+            {
+                "name": "기본 블로그 포스트 생성",
+                "prompt_template": "다음 주제로 전문적이고 유익한 블로그 포스트를 작성해주세요: {topic}. 독자에게 실용적인 가치를 제공하고, SEO에 최적화된 구조로 작성해주세요.",
+                "approver_role": "editor",
+                "auto_transition": True
+            }
+        ]
+        
+        social_media_steps = [
+            {
+                "name": "소셜 미디어 포스트",
+                "prompt_template": "다음 주제로 소셜 미디어용 매력적이고 간결한 포스트를 작성해주세요: {topic}. 독자의 관심을 끌고 상호작용을 유도하는 내용으로 작성해주세요.",
+                "approver_role": "editor", 
+                "auto_transition": True
+            }
+        ]
+        
+        # 여행 정보전달 템플릿
+        travel_steps = [
+            {
+                "name": "여행 정보 콘텐츠 생성",
+                "prompt_template": """다음 여행 주제로 전문적이고 실용적인 여행 가이드를 작성해주세요: {topic}
+
+작성 요구사항:
+- 여행자의 실제 경험과 팁 중심으로 작성
+- 구체적인 장소, 가격, 시간 정보 포함
+- 계절별/시간대별 특징과 추천사항
+- 현지 문화와 예절 정보 포함
+- 교통편, 숙박, 맛집 등 실용 정보 제공
+- 주의사항과 안전 정보 포함
+- 예산 가이드라인 제시
+- 현지인 추천 명소나 숨은 장소 소개
+
+독자가 실제 여행 계획을 세울 때 바로 활용할 수 있는 구체적이고 유용한 정보로 구성해주세요.""",
+                "approver_role": "editor",
+                "auto_transition": True
+            }
+        ]
+
+        # 시사 정보전달 템플릿
+        news_steps = [
+            {
+                "name": "시사 정보 콘텐츠 생성",
+                "prompt_template": """다음 시사 주제로 균형잡히고 객관적인 정보 전달 콘텐츠를 작성해주세요: {topic}
+
+작성 요구사항:
+- 사실에 기반한 객관적 정보 전달
+- 다양한 관점과 의견 균형있게 제시
+- 배경 정보와 맥락 상세히 설명
+- 관련 통계와 데이터 활용
+- 전문가 의견이나 분석 인용
+- 일반인이 이해하기 쉬운 설명
+- 논란이 있는 부분은 여러 시각 제시
+- 향후 전망과 예상 영향 분석
+- 관련 법률이나 정책 정보 포함
+
+독자가 해당 시사 이슈를 정확히 이해하고 균형잡힌 시각을 가질 수 있도록 작성해주세요.""",
+                "approver_role": "editor",
+                "auto_transition": True
+            }
+        ]
+
+        # 기본 블로그 템플릿
+        basic_template = WorkflowTemplate(
+            name="기본 블로그 포스트",
+            description="일반적인 블로그 포스트 생성을 위한 기본 템플릿",
+            steps=json.dumps(basic_blog_steps),
+            version="v1.0",
+            status="inactive",  # 새로운 전문 템플릿들을 우선 사용하도록 비활성화
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat(),
+            created_by=1
+        )
+        
+        # 여행 정보전달 템플릿
+        travel_template = WorkflowTemplate(
+            name="여행 정보전달",
+            description="여행 가이드 및 여행 정보 콘텐츠 전문 생성 템플릿",
+            steps=json.dumps(travel_steps),
+            version="v1.0", 
+            status="active",
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat(),
+            created_by=1
+        )
+
+        # 시사 정보전달 템플릿
+        news_template = WorkflowTemplate(
+            name="시사 정보전달",
+            description="시사 이슈 및 뉴스 정보 객관적 전달 템플릿",
+            steps=json.dumps(news_steps),
+            version="v1.0", 
+            status="active",
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat(),
+            created_by=1
+        )
+        
+        # 소셜 미디어 템플릿
+        social_template = WorkflowTemplate(
+            name="소셜 미디어 포스트",
+            description="SNS용 짧고 매력적인 포스트 생성 템플릿",
+            steps=json.dumps(social_media_steps),
+            version="v1.0", 
+            status="active",
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat(),
+            created_by=1
+        )
+        
+        db.create_workflow_template(basic_template)
+        db.create_workflow_template(travel_template)
+        db.create_workflow_template(news_template)
+        db.create_workflow_template(social_template)
+        print("📝 기본 워크플로우 템플릿 생성됨")
+        
+    except Exception as e:
+        print(f"⚠️  워크플로우 템플릿 생성 중 오류 (이미 존재할 수 있음): {e}")
     
     print("\n🔑 기본 계정 정보:")
     print("   - admin / admin123! (관리자, 무제한)")

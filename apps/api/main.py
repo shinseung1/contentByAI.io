@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from packages.core.config import get_settings
 from packages.core.database import create_tables
-from apps.api.routers import bundles, generation, publishing, health
+from apps.api.routers import bundles, generation, publishing, health, users, workflows
 
 # 간단한 인메모리 인증
 USERS = {
@@ -61,9 +61,9 @@ def create_app() -> FastAPI:
     
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=False,  # credentials를 false로 변경
-        allow_methods=["*"],
+        allow_origins=["http://localhost:3002", "http://127.0.0.1:3002", "http://localhost:3001", "http://127.0.0.1:3001", "http://localhost:3005", "http://127.0.0.1:3005"],
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
     
@@ -71,6 +71,8 @@ def create_app() -> FastAPI:
     app.include_router(bundles.router, prefix="/api/v1")
     app.include_router(generation.router, prefix="/api/v1")
     app.include_router(publishing.router, prefix="/api/v1")
+    app.include_router(users.router, prefix="/api/v1")
+    app.include_router(workflows.router, prefix="/api/v1")
     
     # Auth endpoints directly in main
     @app.post("/api/v1/auth/login", response_model=LoginResponse)

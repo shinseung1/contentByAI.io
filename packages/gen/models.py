@@ -27,6 +27,7 @@ class GenerationRequest(BaseModel):
     target_language: str = Field("ko", max_length=10, description="Target language code")
     num_options: Optional[int] = Field(1, ge=1, le=5, description="Number of content options to generate")
     balance_word_count: bool = Field(True, description="Whether to balance word count across multiple options")
+    workflow_template_id: Optional[int] = Field(None, description="ID of workflow template to use")
 
 
 class ImageInfo(dict):

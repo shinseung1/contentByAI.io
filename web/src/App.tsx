@@ -9,6 +9,7 @@ import Generation from './pages/Generation'
 import GenerationGemini from './pages/GenerationGemini'
 import GenerationClaude from './pages/GenerationClaude'
 import GenerationOpenAI from './pages/GenerationOpenAI'
+import GenerationHistory from './pages/GenerationHistory'
 import Bundles from './pages/Bundles'
 import Publishing from './pages/Publishing'
 import Settings from './pages/Settings'
@@ -43,6 +44,7 @@ const AppContent: React.FC = () => {
           <Route path="/generation/gemini" element={<GenerationGemini />} />
           <Route path="/generation/claude" element={<GenerationClaude />} />
           <Route path="/generation/openai" element={<GenerationOpenAI />} />
+          <Route path="/generation/history" element={<GenerationHistory />} />
           <Route path="/bundles" element={<Bundles />} />
           <Route path="/publishing" element={<Publishing />} />
           <Route path="/settings" element={<Settings />} />

@@ -1,0 +1,14 @@
+=== COMPLETE PIPELINE TEST RESULTS ===
+Job ID: 2a306e67-8692-4cde-bf72-1818a3ce7393
+Status: completed
+Original topic: 한국의 전통 음식과 문화
+Topic in DB: 한국의 전통 음식과 문화
+
+Generated title: Content about 한국의 전통 음식과 문화
+Korean words in title: 4
+Korean words in content: 0
+
+Content preview (first 500 chars):
+...
+
+PARTIAL SUCCESS: Korean characters found in some content.

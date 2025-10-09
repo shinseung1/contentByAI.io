@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react'
 import { Card, Form, Input, Button, Select, InputNumber, Switch, Typography, Space, message, Row, Col, Statistic, Progress, Alert, List, Tag, Divider } from 'antd'
 import { RobotOutlined, SendOutlined, ExperimentOutlined, SafetyOutlined, EyeOutlined, HistoryOutlined, ClockCircleOutlined } from '@ant-design/icons'
-import { api, GenerationRequest, GenerationResponse } from '../services/api'
+import { api, GenerationRequest, GenerationResponse, API_BASE_URL } from '../services/api'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
+
+interface WorkflowTemplate {
+  id: number
+  name: string
+  description: string
+  status: string
+}
 
 const GenerationClaude: React.FC = () => {
   const [form] = Form.useForm()
@@ -14,6 +21,26 @@ const GenerationClaude: React.FC = () => {
   const [progress, setProgress] = useState(0)
   const [historyJobs, setHistoryJobs] = useState<any[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowTemplate[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null)
+
+  // 워크플로우 템플릿 로드
+  const fetchWorkflowTemplates = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/workflows/active`)
+      if (response.ok) {
+        const templates = await response.json()
+        setWorkflowTemplates(templates)
+        // 첫 번째 활성 템플릿을 기본 선택
+        if (templates.length > 0) {
+          setSelectedTemplate(templates[0])
+          form.setFieldsValue({ workflow_template: templates[0].id })
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch workflow templates:', error)
+    }
+  }
 
   // 히스토리 로드
   const loadHistory = async () => {
@@ -34,9 +61,10 @@ const GenerationClaude: React.FC = () => {
     }
   }
 
-  // 컴포넌트 마운트 시 히스토리 로드
+  // 컴포넌트 마운트 시 히스토리 및 워크플로우 템플릿 로드
   useEffect(() => {
     loadHistory()
+    fetchWorkflowTemplates()
   }, [])
 
   const pollJobStatus = async (jobId: string) => {
@@ -72,7 +100,9 @@ const GenerationClaude: React.FC = () => {
     try {
       const request: GenerationRequest = {
         ...values,
-        provider: 'claude'
+        provider: 'claude',
+        tone: 'professional', // tone은 워크플로우 템플릿에서 결정됨
+        workflow_template_id: values.workflow_template
       }
 
       console.log('Claude generation request:', request)
@@ -150,7 +180,6 @@ const GenerationClaude: React.FC = () => {
           onFinish={handleGenerate}
           initialValues={{
             provider: 'claude',
-            tone: 'professional',
             word_count: 800,
             include_images: true,
             target_language: 'ko',
@@ -174,19 +203,45 @@ const GenerationClaude: React.FC = () => {
             />
           </Form.Item>
 
+          <Form.Item 
+            name="workflow_template" 
+            label="워크플로우 템플릿"
+            rules={[{ required: true, message: '워크플로우 템플릿을 선택해주세요.' }]}
+          >
+            <Select 
+              placeholder="워크플로우 템플릿을 선택하세요"
+              onChange={(templateId) => {
+                const template = workflowTemplates.find(t => t.id === templateId)
+                setSelectedTemplate(template || null)
+              }}
+              loading={workflowTemplates.length === 0}
+            >
+              {workflowTemplates.map(template => (
+                <Select.Option key={template.id} value={template.id}>
+                  {template.name}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          {selectedTemplate && (
+            <div style={{ 
+              marginBottom: 16, 
+              padding: 12, 
+              backgroundColor: '#000000', 
+              borderRadius: 4,
+              border: '1px solid #333333',
+              color: '#ffffff'
+            }}>
+              <strong style={{ color: '#ffffff' }}>선택된 템플릿:</strong> {selectedTemplate.name}
+              <br />
+              <span style={{ color: '#cccccc', fontSize: '12px' }}>
+                {selectedTemplate.description}
+              </span>
+            </div>
+          )}
+
           <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="tone" label="톤 앤 매너">
-                <Select>
-                  <Select.Option value="professional">전문적</Select.Option>
-                  <Select.Option value="casual">캐주얼</Select.Option>
-                  <Select.Option value="friendly">친근한</Select.Option>
-                  <Select.Option value="academic">학술적</Select.Option>
-                  <Select.Option value="conversational">대화형</Select.Option>
-                  <Select.Option value="analytical">분석적</Select.Option>
-                </Select>
-              </Form.Item>
-            </Col>
             <Col span={12}>
               <Form.Item name="word_count" label="목표 단어 수">
                 <InputNumber
@@ -234,7 +289,13 @@ const GenerationClaude: React.FC = () => {
               >
                 Claude로 생성 시작
               </Button>
-              <Button size="large" onClick={() => form.resetFields()}>
+              <Button size="large" onClick={() => {
+                form.resetFields()
+                // 템플릿 기본값 다시 설정
+                if (workflowTemplates.length > 0) {
+                  form.setFieldsValue({ workflow_template: workflowTemplates[0].id })
+                }
+              }}>
                 초기화
               </Button>
             </Space>

@@ -1,21 +1,85 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Card, Form, Input, Button, Select, InputNumber, Switch, Typography, Space, message } from 'antd'
 import { EditOutlined, SendOutlined } from '@ant-design/icons'
+import { API_BASE_URL } from '../services/api'
 
 const { Title } = Typography
 const { TextArea } = Input
 
+interface WorkflowTemplate {
+  id: number
+  name: string
+  description: string
+  status: string
+}
+
 const Generation: React.FC = () => {
   const [form] = Form.useForm()
   const [loading, setLoading] = React.useState(false)
+  const [workflowTemplates, setWorkflowTemplates] = React.useState<WorkflowTemplate[]>([])
+  const [selectedTemplate, setSelectedTemplate] = React.useState<WorkflowTemplate | null>(null)
+
+  useEffect(() => {
+    fetchWorkflowTemplates()
+  }, [])
+
+  const fetchWorkflowTemplates = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/workflows/active`)
+      if (response.ok) {
+        const templates = await response.json()
+        setWorkflowTemplates(templates)
+        // 첫 번째 활성 템플릿을 기본 선택
+        if (templates.length > 0) {
+          setSelectedTemplate(templates[0])
+          form.setFieldsValue({ workflow_template: templates[0].id })
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch workflow templates:', error)
+    }
+  }
+
+  const handleTemplateChange = (templateId: number) => {
+    const template = workflowTemplates.find(t => t.id === templateId)
+    setSelectedTemplate(template || null)
+  }
 
   const handleGenerate = async (values: any) => {
     setLoading(true)
     try {
-      // API 호출 로직
-      console.log('Generation request:', values)
-      message.success('콘텐츠 생성 요청이 시작되었습니다!')
+      const requestData = {
+        topic: values.topic,
+        tone: 'professional', // tone은 워크플로우 템플릿에서 결정됨
+        word_count: values.word_count,
+        target_language: values.target_language,
+        include_images: values.include_images,
+        provider: 'gemini',
+        workflow_template_id: values.workflow_template // 워크플로우 템플릿 ID 추가
+      }
+
+      const response = await fetch(`${API_BASE_URL}/generation/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        message.success(`콘텐츠 생성이 시작되었습니다! Job ID: ${result.job_id}`)
+        form.resetFields()
+        // 템플릿 기본값 다시 설정
+        if (workflowTemplates.length > 0) {
+          form.setFieldsValue({ workflow_template: workflowTemplates[0].id })
+        }
+      } else {
+        const error = await response.json()
+        message.error(`콘텐츠 생성 실패: ${error.detail || '알 수 없는 오류'}`)
+      }
     } catch (error) {
+      console.error('Generation error:', error)
       message.error('콘텐츠 생성 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
@@ -34,7 +98,6 @@ const Generation: React.FC = () => {
           layout="vertical"
           onFinish={handleGenerate}
           initialValues={{
-            tone: 'professional',
             word_count: 800,
             include_images: true,
             target_language: 'ko',
@@ -54,15 +117,39 @@ const Generation: React.FC = () => {
             />
           </Form.Item>
 
-          <Form.Item name="tone" label="톤 앤 매너">
-            <Select>
-              <Select.Option value="professional">전문적</Select.Option>
-              <Select.Option value="casual">캐주얼</Select.Option>
-              <Select.Option value="friendly">친근한</Select.Option>
-              <Select.Option value="academic">학술적</Select.Option>
-              <Select.Option value="conversational">대화형</Select.Option>
+          <Form.Item 
+            name="workflow_template" 
+            label="워크플로우 템플릿"
+            rules={[{ required: true, message: '워크플로우 템플릿을 선택해주세요.' }]}
+          >
+            <Select 
+              placeholder="워크플로우 템플릿을 선택하세요"
+              onChange={handleTemplateChange}
+              loading={workflowTemplates.length === 0}
+            >
+              {workflowTemplates.map(template => (
+                <Select.Option key={template.id} value={template.id}>
+                  {template.name}
+                </Select.Option>
+              ))}
             </Select>
           </Form.Item>
+
+          {selectedTemplate && (
+            <div style={{ 
+              marginBottom: 16, 
+              padding: 12, 
+              backgroundColor: '#f5f5f5', 
+              borderRadius: 4,
+              border: '1px solid #d9d9d9'
+            }}>
+              <strong>선택된 템플릿:</strong> {selectedTemplate.name}
+              <br />
+              <span style={{ color: '#666', fontSize: '12px' }}>
+                {selectedTemplate.description}
+              </span>
+            </div>
+          )}
 
           <Form.Item name="word_count" label="목표 단어 수">
             <InputNumber

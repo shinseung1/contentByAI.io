@@ -16,7 +16,7 @@ class GeminiClient(BaseAIClient):
     def _get_headers(self) -> dict:
         """Get headers for Gemini API."""
         return {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json; charset=utf-8"
         }
     
     async def generate(self, request: AIRequest) -> AIResponse:
@@ -32,7 +32,8 @@ class GeminiClient(BaseAIClient):
         response = await self._client.post(
             url,
             json=formatted_request,
-            params=params
+            params=params,
+            headers=self._get_headers()
         )
         response.raise_for_status()
         
@@ -75,6 +76,9 @@ class GeminiClient(BaseAIClient):
             candidate = response_data["candidates"][0]
             if candidate.get("content") and candidate["content"].get("parts"):
                 content = candidate["content"]["parts"][0].get("text", "")
+                
+                # Gemini API returns proper UTF-8 encoded content, no encoding fix needed
+                # The previous latin-1 fix was actually corrupting the data
         
         usage = response_data.get("usageMetadata", {})
         

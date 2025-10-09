@@ -15,6 +15,7 @@ import {
   ExperimentOutlined,
   RobotOutlined,
   BulbOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons'
 
 const { Header, Sider, Content } = Layout
@@ -66,6 +67,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           key: '/generation/openai',
           icon: <BulbOutlined />,
           label: 'OpenAI',
+        },
+        {
+          key: '/generation/history',
+          icon: <HistoryOutlined />,
+          label: '생성 히스토리',
         },
       ],
     },
