@@ -775,6 +775,264 @@ class ContentGenerator:
     def _create_user_prompt(self, request: GenerationRequest) -> str:
         """Create user prompt for AI."""
         return f"주제 '{request.topic}'에 대해 위의 지시사항에 따라 콘텐츠를 작성해주세요."
+                is_ranking_topic_user = True
+                break
+        
+        # Also check Korean numbers for user prompt
+        korean_numbers = {
+            '세': 3, '삼': 3, '네': 4, '사': 4, '다섯': 5, '오': 5,
+            '여섯': 6, '육': 6, '일곱': 7, '칠': 7, '여덟': 8, '팔': 8,
+            '아홉': 9, '구': 9, '열': 10
+        }
+        
+        for korean_num, num_val in korean_numbers.items():
+            if korean_num in topic_lower and ('가지' in topic_lower or '개' in topic_lower):
+                ranking_number_user = num_val
+                is_ranking_topic_user = True
+                break
+        
+        comparison_reminder = ""
+        top_reminder = ""
+        
+        # Generate TOP reminder if it's a ranking topic
+        if is_ranking_topic_user and ranking_number_user:
+            ranking_emojis = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+            section_list = []
+            
+            for i in range(ranking_number_user):
+                rank_num = i + 1
+                emoji = ranking_emojis[i] if i < len(ranking_emojis) else f"{rank_num}️⃣"
+                section_list.append(f"- ## {emoji} {rank_num}위 (또는 TOP{rank_num}): [구체적 항목명] - 매우 상세한 설명 (최소 400-500단어)")
+            
+            sections_text = '\n'.join(section_list)
+            
+            top_reminder = f"""
+**🏆 TOP{ranking_number_user}/순위 주제 절대 필수사항 (매우 중요!):**
+주제 "{request.topic}"는 TOP{ranking_number_user} 순위 주제입니다. 반드시 다음을 지켜주세요:
+
+**📊 필수 구조 (절대 준수):**
+{sections_text}
+
+**⚠️ 절대 규칙:**
+- **정확히 {ranking_number_user}개 항목** 모두 포함 (하나도 빠뜨리면 안됨)
+- **각 항목별로 큰 독립 섹션** 구성 (작은 카드로 쪼개지 말고)
+- **모든 항목 균등한 분량** (400-500단어씩)
+- **종합 랭킹 비교표 필수** - {ranking_number_user}개 항목 한눈에 비교
+- **선택 가이드표 필수** - 상황별 추천 가이드
+
+"""
+        
+        if is_comparison_topic:
+            comparison_reminder = f"""
+**🔥 비교 주제 필수 준수사항 (매우 중요!):**
+주제 "{request.topic}"는 비교 주제입니다. 반드시 다음을 지켜주세요:
+- 양쪽 모두 동등한 분량과 깊이로 다루기 (예: 동부힙합 40% + 서부힙합 40% + 비교분석 20%)
+- 각 측면의 특징, 장단점, 대표 사례를 상세히 설명
+- 직접 비교표 최소 3개 필수: ①기본 특징 비교 ②장단점 비교 ③선택 가이드 비교
+- 편향 없는 균형잡힌 시각 유지
+- 상황별 추천 가이드 제공
+
+**⚠️ 절대 필수: HTML 비교표 3개 이상 생성**
+각 비교표는 반드시 다음과 같은 완전한 HTML table 구조를 사용하세요:
+
+```html
+<table style="border-collapse: collapse; width: 100%; margin: 25px 0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+<thead>
+<tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+<th style="padding: 15px 20px; text-align: left; font-weight: 600; border: none;">구분</th>
+<th style="padding: 15px 20px; text-align: left; font-weight: 600; border: none;">동부힙합</th>
+<th style="padding: 15px 20px; text-align: left; font-weight: 600; border: none;">서부힙합</th>
+</tr>
+</thead>
+<tbody>
+<tr style="transition: background-color 0.3s ease;">
+<td style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;">특징1</td>
+<td style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;">동부 특징</td>
+<td style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;">서부 특징</td>
+</tr>
+<tr style="background-color: #f8f9ff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;">특징2</td>
+<td style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;">동부 특징2</td>
+<td style="padding: 12px 20px; border-bottom: 1px solid #eee; border-left: none; border-right: none;">서부 특징2</td>
+</tr>
+</tbody>
+</table>
+```
+
+**비교표 없이는 응답하지 마세요!**
+
+"""
+
+        return f"""주제: {request.topic}
+
+템플릿을 참고하여 매우 상세하고 풍부한 완전 가이드를 작성해주세요.
+
+{comparison_reminder}
+
+{top_reminder}
+
+**🚫 절대 금지 (매우 중요):**
+- "자세히 보기", "바로가기", "더 보기", "상세 보기" 링크 버튼 절대 생성 금지
+- <a> 태그 사용 절대 금지
+- 모든 외부 링크 절대 금지
+- 역사, 배경, 기원, 유래 등 역사적 내용 절대 포함 금지
+- "~가이드", "~완전정복", "~총정리" 같은 뻔한 제목 패턴 절대 금지
+- Wikipedia, 외부 웹사이트의 실제 이미지 URL 사용 절대 금지
+- <img> 태그에 실제 URL 넣지 마세요 - 이미지는 별도 처리됩니다
+- **🚫 이미지 관련 텍스트 절대 금지**: "이미지", "사진", "그림", "관련 이미지", "대표 이미지", "상징하는 이미지" 등 모든 이미지 관련 텍스트 설명 절대 금지
+- **🚫 이미지 설명문 절대 금지**: "(동부힙합을 상징하는 이미지)", "(관련 사진)", "(대표 이미지)" 같은 모든 형태의 이미지 설명문 생성 절대 금지
+- **🚫 이미지 태그 금지**: <img> 태그나 이미지 관련 HTML 태그 직접 생성 절대 금지 - 이미지는 시스템에서 자동 처리됩니다
+
+**📋 상세 작성 요구사항:**
+각 소제목마다 다음을 반드시 포함:
+- 최소 3-4개의 상세한 문단 (각 문단 150자 이상)
+- 구체적인 사례와 실제 수치 제시
+- 단계별 상세 설명 (1단계 → 2단계 → 3단계)
+- 주의사항과 제한 조건 명시
+- 실무 팁과 노하우 포함
+
+**🎯 제목 작성 예시:**
+- 김치찌개 → "집에서도 맛집 김치찌개! 황금 레시피 대공개"
+- 신용카드 포인트 → "놓치면 손해! 신용카드 포인트 200% 활용 비법"
+- 마일리지 적립 → "이제 걱정 끝! 마일리지 폭탄 적립 완벽 공략"
+
+**핵심 구조 (매우 상세하게):**
+# [창의적이고 매력적인 제목]
+> 한 줄 요약 (실용적 혜택 강조)
+
+## 🎯 어디로 갈까? (개요 설명)
+
+## 🚀 선택 1) 첫 번째 방법 (3-4문단으로 상세 설명)
+**⚠️ 절대 필수**: 선택 1, 2, 3을 모두 동일한 분량으로 작성해야 합니다!
+
+## 🚗 선택 2) 두 번째 방법 (3-4문단으로 상세 설명)
+**⚠️ 절대 필수**: 선택 1과 동일한 길이와 상세함으로 작성
+
+## 🚌 선택 3) 세 번째 방법 (3-4문단으로 상세 설명)
+**⚠️ 절대 필수**: 선택 1, 2와 동일한 수준의 분량과 상세함으로 작성
+
+## 📊 한눈에 비교 표 (상세 비교표)
+## 🎯 케이스별 추천 (각 케이스마다 상세 설명)
+## ❓ 자주 묻는 질문(FAQ) (5개 이상, 각각 상세 답변)
+## 📝 요약 박스 (핵심 정리)
+
+**품질 기준:**
+- {min_words}-{max_words}단어 (매우 풍부한 내용)
+- 테이블 5-7개 이상{"" if not is_comparison_topic else " (비교 주제는 비교표 3개 필수)"}
+- 링크 절대 생성 금지
+- 톤: {request.tone}
+
+{important_points}"""
+        
+        # Add topic-specific guidance based on detected topic type
+        topic_specific_guidance = ""
+        
+        if is_transportation_topic:
+            topic_specific_guidance = """
+
+🚨 **교통/이동방법 주제 특별 요구사항:**
+- **구체적인 교통수단 상세 설명**: 버스, 지하철, 택시, 자동차, 도보, 자전거, 기차, 항공편 등
+- **실용적 정보 필수 포함**: 소요시간, 정확한 요금, 노선번호, 정류장명, 환승방법
+- **단계별 이동 경로**: 출발지 → 경유지 → 목적지까지 상세한 순서 설명
+- **시간표 정보**: 운행간격, 첫차/막차 시간, 주말/평일 차이점
+
+**각 선택지별 필수 내용:**
+- 선택 1: 가장 빠른 이동방법 (시간 중심)
+- 선택 2: 가장 경제적인 이동방법 (비용 중심)  
+- 선택 3: 가장 편리한 이동방법 (편의성 중심)"""
+
+        elif is_food_topic:
+            topic_specific_guidance = """
+
+🍽️ **음식/요리 주제 특별 요구사항:**
+- **재료 및 조리법 상세 설명**: 필수 재료, 대체 재료, 정확한 계량, 조리 순서
+- **맛집 정보**: 위치, 대표 메뉴, 가격대, 영업시간, 예약 방법
+- **영양 정보**: 칼로리, 영양소, 건강 효과, 주의사항
+- **보관 및 섭취 팁**: 보관법, 먹는 방법, 곁들일 음식
+
+**각 선택지별 필수 내용:**
+- 선택 1: 전통적/정통 방식 
+- 선택 2: 간편한/현대적 방식
+- 선택 3: 고급/특별한 방식"""
+
+        elif is_health_topic:
+            topic_specific_guidance = """
+
+🏥 **건강/의료 주제 특별 요구사항:**
+- **증상 및 원인 설명**: 구체적 증상, 발생 원인, 진행 과정
+- **예방 및 관리법**: 생활습관 개선, 주의사항, 예방법
+- **전문 의료진 조언**: 병원 진료 시기, 검사 방법, 치료 옵션
+- **⚠️ 면책조항**: "본 정보는 일반적인 건강 정보이며, 개인별 상황에 따라 다를 수 있습니다. 정확한 진단과 치료는 반드시 의료진과 상담하세요."
+
+**각 선택지별 필수 내용:**
+- 선택 1: 즉시 대처법 (응급 상황)
+- 선택 2: 생활 관리법 (일상 관리)
+- 선택 3: 전문 치료법 (의료진 상담)"""
+
+        elif is_weather_topic:
+            topic_specific_guidance = """
+
+🌤️ **날씨/기후 주제 특별 요구사항:**
+- **기상 정보 상세 분석**: 온도, 습도, 강수확률, 바람, 자외선 지수
+- **계절별/지역별 특성**: 지역 기후 특징, 계절별 변화, 극값 정보
+- **생활 영향 및 대비**: 옷차림, 외출 준비, 건강 관리, 농업/산업 영향
+- **날씨 예보 해석**: 기상청 용어 설명, 확률 의미, 주의보/경보
+
+**각 선택지별 필수 내용:**
+- 선택 1: 단기 예보 (1-3일)
+- 선택 2: 중기 예보 (1주일)  
+- 선택 3: 장기 전망 (계절/연간)"""
+
+        elif is_music_topic:
+            topic_specific_guidance = """
+
+🎵 **음악/엔터테인먼트 주제 특별 요구사항:**
+- **장르 및 특성 분석**: 음악적 특징, 대표 아티스트, 역사적 배경
+- **추천 리스트**: 상황별 추천곡, 플레이리스트 구성, 분위기별 선곡
+- **감상 포인트**: 악기 구성, 보컬 특징, 가사 해석, 프로듀싱 기법
+- **접근 방법**: 스트리밍 서비스, 음원 구매, 콘서트 정보
+
+**각 선택지별 필수 내용:**
+- 선택 1: 클래식/정통 추천
+- 선택 2: 인기/트렌드 추천
+- 선택 3: 숨은 명곡/마니아 추천"""
+
+        elif is_tourism_topic:
+            topic_specific_guidance = """
+
+🗺️ **관광/여행지 주제 특별 요구사항:**
+- **명소 상세 정보**: 위치, 특징, 볼거리, 역사적 의미, 최적 관람 시간
+- **실용 정보**: 입장료, 운영시간, 주차, 대중교통 접근법, 주변 편의시설
+- **계절별/시간별 특징**: 계절별 매력, 시간대별 추천, 혼잡도 정보
+- **주변 관광 코스**: 인근 명소, 추천 코스, 소요시간, 연계 여행
+
+**각 선택지별 필수 내용:**
+- 선택 1: 대표 명소 (Must-See)
+- 선택 2: 숨은 명소 (Hidden Gems)
+- 선택 3: 체험 활동 (Activities)"""
+
+        else:
+            # Universal guidance for all other topics
+            topic_specific_guidance = f"""
+
+🎯 **"{request.topic}" 주제 맞춤 요구사항:**
+- **주제의 핵심 가치**: 해당 주제가 사용자에게 제공하는 실질적 가치와 혜택을 명확히 설명
+- **단계별 접근법**: 초보자부터 숙련자까지 단계별로 접근할 수 있는 방법 제시
+- **실용적 팁과 노하우**: 실제 경험에서 나오는 유용한 팁과 주의사항
+- **다양한 관점 제시**: 여러 각도에서 주제를 바라보고 균형잡힌 시각 제공
+
+**각 선택지별 필수 내용:**
+- 선택 1: 기본/입문자 접근법
+- 선택 2: 중급/실용적 접근법  
+- 선택 3: 고급/전문가 접근법
+
+**주제 정확성 절대 준수**: 반드시 "{request.topic}"와 직접 관련된 내용만 작성하고, 다른 주제로 벗어나지 마세요."""
+
+        if topic_specific_guidance:
+            prompt += topic_specific_guidance
+        
+        return prompt
+    
     def _convert_markdown_to_html(self, markdown_content: str) -> str:
         """Convert markdown content to HTML."""
         import re

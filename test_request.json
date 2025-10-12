@@ -1,0 +1,8 @@
+{
+  "topic": "커피 맛있게 내리는 방법",
+  "provider": "openai",
+  "tone": "friendly", 
+  "word_count": 300,
+  "include_images": false,
+  "target_language": "ko"
+}

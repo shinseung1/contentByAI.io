@@ -145,6 +145,7 @@ async def list_generation_jobs():
                 "completed_at": str(db_job.updated_at) if db_job.status in ['completed', 'failed'] and db_job.updated_at else None,
                 "tone": db_job.tone,
                 "word_count": db_job.word_count,
+                "content": db_job.content if db_job.status == 'completed' else None,
                 "error": db_job.error_message,
                 "target_language": db_job.target_language,
                 "include_images": db_job.include_images
