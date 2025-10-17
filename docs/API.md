@@ -338,6 +338,228 @@ AI를 사용하여 새로운 콘텐츠를 생성합니다.
 
 ---
 
+### 5. 예약 포스팅 관리
+
+#### POST /scheduled-posts/
+
+새로운 예약 포스트를 생성합니다.
+
+**요청**
+```json
+{
+  "title": "AI 기술 트렌드 분석",
+  "topic": "2024년 인공지능 기술 동향",
+  "topic_source": "user",
+  "schedule_time": "2025-10-18T09:30:00+09:00",
+  "provider": "gemini",
+  "workflow_template_id": 2,
+  "repeat_config": {
+    "frequency": "weekly",
+    "count": 4
+  }
+}
+```
+
+**요청 필드**
+- `title` (string, required): 포스트 제목 (1-200자)
+- `topic` (string, optional): 사용자 지정 주제 (topic_source가 "user"인 경우 필수)
+- `topic_source` (string, required): 주제 소스 ("user" 또는 "trend")
+- `schedule_time` (string, required): 예약 실행 시간 (ISO datetime)
+- `provider` (string, optional): AI 제공자 (기본값: "gemini")
+- `workflow_template_id` (integer, optional): 워크플로우 템플릿 ID
+- `repeat_config` (object, optional): 반복 설정
+
+**응답**
+```json
+{
+  "schedule_id": "550e8400-e29b-41d4-a716-446655440000",
+  "message": "예약 포스트가 생성되었습니다",
+  "id": 123
+}
+```
+
+**상태 코드**
+- `200`: 생성 성공
+- `400`: 잘못된 요청 (유효성 검사 실패)
+- `500`: 서버 오류
+
+#### GET /scheduled-posts/
+
+예약 포스트 목록을 조회합니다.
+
+**쿼리 파라미터**
+- `status` (string, optional): 상태 필터 ("pending", "completed", "failed", "paused")
+- `limit` (integer, optional): 최대 반환 개수 (기본값: 50)
+
+**응답**
+```json
+[
+  {
+    "id": 123,
+    "schedule_id": "550e8400-e29b-41d4-a716-446655440000",
+    "title": "AI 기술 트렌드 분석",
+    "topic": "2024년 인공지능 기술 동향",
+    "topic_source": "user",
+    "schedule_time": "2025-10-18T09:30:00+09:00",
+    "status": "pending",
+    "provider": "gemini",
+    "workflow_template_id": 2,
+    "repeat_config": {
+      "frequency": "weekly",
+      "count": 4
+    },
+    "generated_job_id": null,
+    "error_message": null,
+    "created_at": "2025-10-17T10:00:00+09:00",
+    "updated_at": "2025-10-17T10:00:00+09:00",
+    "last_executed_at": null
+  }
+]
+```
+
+#### GET /scheduled-posts/{schedule_id}
+
+특정 예약 포스트의 상세 정보를 조회합니다.
+
+**응답**
+```json
+{
+  "id": 123,
+  "schedule_id": "550e8400-e29b-41d4-a716-446655440000",
+  "title": "AI 기술 트렌드 분석",
+  "topic": "2024년 인공지능 기술 동향",
+  "topic_source": "user",
+  "schedule_time": "2025-10-18T09:30:00+09:00",
+  "status": "pending",
+  "provider": "gemini",
+  "workflow_template_id": 2,
+  "repeat_config": {
+    "frequency": "weekly", 
+    "count": 4
+  },
+  "generated_job_id": null,
+  "error_message": null,
+  "created_at": "2025-10-17T10:00:00+09:00",
+  "updated_at": "2025-10-17T10:00:00+09:00",
+  "last_executed_at": null
+}
+```
+
+**상태 코드**
+- `200`: 조회 성공
+- `404`: 예약 포스트를 찾을 수 없음
+
+#### PUT /scheduled-posts/{schedule_id}
+
+예약 포스트를 수정합니다.
+
+**요청**
+```json
+{
+  "title": "수정된 제목",
+  "schedule_time": "2025-10-19T10:00:00+09:00",
+  "status": "paused"
+}
+```
+
+**응답**
+```json
+{
+  "message": "예약 포스트가 수정되었습니다"
+}
+```
+
+#### DELETE /scheduled-posts/{schedule_id}
+
+예약 포스트를 삭제합니다.
+
+**응답**
+```json
+{
+  "message": "예약 포스트가 삭제되었습니다"
+}
+```
+
+**상태 코드**
+- `200`: 삭제 성공
+- `404`: 예약 포스트를 찾을 수 없음
+
+#### POST /scheduled-posts/{schedule_id}/toggle-status
+
+예약 포스트의 상태를 토글합니다 (pending ↔ paused).
+
+**응답**
+```json
+{
+  "message": "상태가 paused로 변경되었습니다",
+  "status": "paused"
+}
+```
+
+**상태 코드**
+- `200`: 상태 변경 성공
+- `400`: 토글할 수 없는 상태 (completed/failed)
+- `404`: 예약 포스트를 찾을 수 없음
+
+#### GET /scheduled-posts/pending/due
+
+실행 시간이 된 대기 중인 예약 포스트를 조회합니다 (스케줄러용).
+
+**응답**
+```json
+[
+  {
+    "id": 123,
+    "schedule_id": "550e8400-e29b-41d4-a716-446655440000",
+    "title": "AI 기술 트렌드 분석",
+    "topic": "2024년 인공지능 기술 동향",
+    "topic_source": "user",
+    "schedule_time": "2025-10-17T09:30:00+09:00",
+    "status": "pending",
+    "provider": "gemini",
+    "workflow_template_id": 2,
+    "repeat_config": null,
+    "generated_job_id": null,
+    "error_message": null,
+    "created_at": "2025-10-16T10:00:00+09:00",
+    "updated_at": "2025-10-16T10:00:00+09:00",
+    "last_executed_at": null
+  }
+]
+```
+
+---
+
+### 6. 워크플로우 템플릿 관리
+
+#### GET /workflows/
+
+워크플로우 템플릿 목록을 조회합니다.
+
+**응답**
+```json
+[
+  {
+    "id": 1,
+    "name": "여행 정보전달",
+    "description": "여행 가이드 및 여행 정보 콘텐츠 전문 생성 템플릿",
+    "version": "v1.0",
+    "status": "active",
+    "created_at": "2025-01-01T00:00:00Z"
+  },
+  {
+    "id": 2,
+    "name": "시사 정보전달", 
+    "description": "시사 이슈 및 뉴스 정보 객관적 전달 템플릿",
+    "version": "v1.0",
+    "status": "active",
+    "created_at": "2025-01-01T00:00:00Z"
+  }
+]
+```
+
+---
+
 ## 웹훅 (향후 지원 예정)
 
 ### POST /webhooks/generation/complete
@@ -443,6 +665,44 @@ curl -X POST "http://localhost:3000/api/v1/publishing/publish" \
 
 # 연결 테스트
 curl -X POST "http://localhost:3000/api/v1/publishing/test-connection/wordpress"
+
+# 예약 포스트 생성
+curl -X POST "http://localhost:3000/api/v1/scheduled-posts/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "AI 기술 트렌드 분석",
+    "topic": "2024년 인공지능 기술 동향",
+    "topic_source": "user",
+    "schedule_time": "2025-10-18T09:30:00+09:00",
+    "provider": "gemini",
+    "workflow_template_id": 2
+  }'
+
+# 예약 포스트 목록 조회
+curl "http://localhost:3000/api/v1/scheduled-posts/?status=pending&limit=10"
+
+# 특정 예약 포스트 조회
+curl "http://localhost:3000/api/v1/scheduled-posts/550e8400-e29b-41d4-a716-446655440000"
+
+# 예약 포스트 수정
+curl -X PUT "http://localhost:3000/api/v1/scheduled-posts/550e8400-e29b-41d4-a716-446655440000" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "수정된 제목",
+    "status": "paused"
+  }'
+
+# 예약 포스트 상태 토글
+curl -X POST "http://localhost:3000/api/v1/scheduled-posts/550e8400-e29b-41d4-a716-446655440000/toggle-status"
+
+# 예약 포스트 삭제
+curl -X DELETE "http://localhost:3000/api/v1/scheduled-posts/550e8400-e29b-41d4-a716-446655440000"
+
+# 실행 대기 중인 예약 포스트 조회 (스케줄러용)
+curl "http://localhost:3000/api/v1/scheduled-posts/pending/due"
+
+# 워크플로우 템플릿 목록 조회
+curl "http://localhost:3000/api/v1/workflows/"
 ```
 
 ## 에러 코드

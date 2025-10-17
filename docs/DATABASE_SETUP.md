@@ -110,7 +110,41 @@ python scripts/init_sample_data.py
 | last_accessed | TEXT | 마지막 접근 시간 |
 | access_count | INTEGER | 접근 횟수 |
 
-### 6. test_results (테스트 결과)
+### 6. scheduled_posts (예약 포스팅)
+| 컬럼명 | 타입 | 설명 |
+|--------|------|------|
+| id | INTEGER PRIMARY KEY | 자동 증가 ID |
+| schedule_id | TEXT UNIQUE | UUID 형태의 예약 ID |
+| title | TEXT | 포스트 제목 |
+| topic | TEXT | 사용자 지정 주제 (선택사항) |
+| topic_source | TEXT | 주제 소스 (user, trend) |
+| schedule_time | TEXT | 예약 실행 시간 (ISO datetime) |
+| status | TEXT | 상태 (pending, completed, failed, paused) |
+| provider | TEXT | AI 제공자 (gemini, openai, claude, grok) |
+| workflow_template_id | INTEGER | 워크플로우 템플릿 ID (외래키) |
+| repeat_config | TEXT | 반복 설정 (JSON) |
+| generated_job_id | TEXT | 생성된 콘텐츠 작업 ID |
+| error_message | TEXT | 오류 메시지 |
+| created_at | TEXT | 생성 시간 |
+| updated_at | TEXT | 수정 시간 |
+| last_executed_at | TEXT | 마지막 실행 시간 |
+
+### 7. bundles (콘텐츠 번들)
+| 컬럼명 | 타입 | 설명 |
+|--------|------|------|
+| id | INTEGER PRIMARY KEY | 자동 증가 ID |
+| bundle_id | TEXT UNIQUE | UUID 형태의 번들 ID |
+| title | TEXT | 번들 제목 |
+| description | TEXT | 설명 |
+| status | TEXT | 상태 (draft, published, archived) |
+| post_count | INTEGER | 포스트 개수 |
+| total_views | INTEGER | 총 조회수 |
+| created_at | TEXT | 생성 시간 |
+| updated_at | TEXT | 수정 시간 |
+| published_at | TEXT | 발행 시간 |
+| metadata | TEXT | 메타데이터 (JSON) |
+
+### 8. test_results (테스트 결과)
 | 컬럼명 | 타입 | 설명 |
 |--------|------|------|
 | id | INTEGER PRIMARY KEY | 자동 증가 ID |
@@ -200,6 +234,51 @@ templates = db.get_active_workflow_templates()
 
 # 특정 템플릿 조회
 template = db.get_workflow_template_by_id(1)
+```
+
+### 예약 포스팅 관리
+```python
+# 예약 포스트 생성
+scheduled_post = ScheduledPost(
+    schedule_id="unique-uuid",
+    title="제목",
+    topic="주제",
+    topic_source="user",  # user 또는 trend
+    schedule_time="2025-10-18T09:30:00+09:00",
+    provider="gemini",
+    workflow_template_id=2
+)
+db.create_scheduled_post(scheduled_post)
+
+# 예약 포스트 조회
+post = db.get_scheduled_post("schedule-uuid")
+posts = db.list_scheduled_posts(status="pending", limit=10)
+
+# 실행 대기 중인 포스트 조회 (스케줄러용)
+pending_posts = db.get_pending_scheduled_posts(datetime.now().isoformat())
+
+# 예약 포스트 수정
+post.status = "paused"
+db.update_scheduled_post(post)
+
+# 예약 포스트 삭제
+db.delete_scheduled_post("schedule-uuid")
+```
+
+### 번들 관리
+```python
+# 번들 생성
+bundle_id = db.create_bundle("bundle-uuid", "번들 제목", "설명")
+
+# 번들 조회
+bundle = db.get_bundle("bundle-uuid")
+bundles = db.list_bundles(limit=20, offset=0)
+
+# 번들 업데이트
+db.update_bundle("bundle-uuid", title="새 제목", status="published")
+
+# 번들 삭제
+db.delete_bundle("bundle-uuid")
 ```
 
 ## 백업 및 복원

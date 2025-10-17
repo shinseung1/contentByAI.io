@@ -1,11 +1,14 @@
-import React from 'react'
-import { Card, Form, Input, Select, Typography, Button, message, TimePicker, Switch } from 'antd'
-import { GlobalOutlined, SaveOutlined } from '@ant-design/icons'
+import React, { useState } from 'react'
+import { Card, Form, Input, Select, Typography, Button, message, TimePicker, Switch, Tabs } from 'antd'
+import { GlobalOutlined, SaveOutlined, ClockCircleOutlined, SettingOutlined } from '@ant-design/icons'
+import ScheduledPosting from './ScheduledPosting'
 
 const { Title, Text } = Typography
+const { TabPane } = Tabs
 
 const UserSEO: React.FC = () => {
   const [form] = Form.useForm()
+  const [activeTab, setActiveTab] = useState('seo')
 
   const handleSave = async (values: any) => {
     try {
@@ -17,8 +20,19 @@ const UserSEO: React.FC = () => {
 
   return (
     <div>
-      <Title level={3}>SEO/배포 기본값</Title>
-      <Text type="secondary">SEO 최적화와 배포 설정의 기본값을 관리합니다</Text>
+      <Tabs activeKey={activeTab} onChange={setActiveTab} size="large">
+        <TabPane 
+          tab={
+            <span>
+              <SettingOutlined />
+              SEO/배포 기본값
+            </span>
+          } 
+          key="seo"
+        >
+          <div>
+            <Title level={3}>SEO/배포 기본값</Title>
+            <Text type="secondary">SEO 최적화와 배포 설정의 기본값을 관리합니다</Text>
 
       <Form form={form} layout="vertical" onFinish={handleSave} style={{ marginTop: 24 }}>
         <Card title="메타 태그 템플릿" style={{ marginBottom: 24 }}>
@@ -64,12 +78,27 @@ const UserSEO: React.FC = () => {
           </Form.Item>
         </Card>
 
-        <Form.Item>
-          <Button type="primary" htmlType="submit" icon={<SaveOutlined />} size="large">
-            기본값 저장
-          </Button>
-        </Form.Item>
-      </Form>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" icon={<SaveOutlined />} size="large">
+                기본값 저장
+              </Button>
+            </Form.Item>
+          </Form>
+          </div>
+        </TabPane>
+        
+        <TabPane 
+          tab={
+            <span>
+              <ClockCircleOutlined />
+              예약 포스팅
+            </span>
+          } 
+          key="scheduling"
+        >
+          <ScheduledPosting />
+        </TabPane>
+      </Tabs>
     </div>
   )
 }

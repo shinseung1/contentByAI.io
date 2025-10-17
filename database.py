@@ -110,6 +110,24 @@ class Bundle:
     published_at: Optional[str] = None
     metadata: Optional[str] = None  # JSON string for additional data
 
+@dataclass
+class ScheduledPost:
+    id: Optional[int] = None
+    schedule_id: str = ""  # UUID
+    title: str = ""
+    topic: Optional[str] = None  # 사용자 지정 주제 (없으면 트렌드 기반)
+    topic_source: str = "user"  # user, trend
+    schedule_time: str = ""  # ISO datetime
+    status: str = "pending"  # pending, completed, failed, paused
+    provider: str = "gemini"  # AI 제공자
+    workflow_template_id: Optional[int] = None
+    repeat_config: Optional[str] = None  # JSON string for repeat settings
+    generated_job_id: Optional[str] = None  # 생성된 콘텐츠 작업 ID
+    error_message: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    last_executed_at: Optional[str] = None
+
 class DatabaseManager:
     def __init__(self, db_path: str = DATABASE_PATH):
         self.db_path = db_path
@@ -219,6 +237,28 @@ class DatabaseManager:
                     FOREIGN KEY (created_by) REFERENCES users (id)
                 )
             """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS scheduled_posts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    schedule_id TEXT UNIQUE NOT NULL,
+                    title TEXT NOT NULL,
+                    topic TEXT,
+                    topic_source TEXT NOT NULL DEFAULT 'user',
+                    schedule_time TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    provider TEXT NOT NULL DEFAULT 'gemini',
+                    workflow_template_id INTEGER,
+                    repeat_config TEXT,
+                    generated_job_id TEXT,
+                    error_message TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    last_executed_at TEXT,
+                    FOREIGN KEY (workflow_template_id) REFERENCES workflow_templates (id),
+                    FOREIGN KEY (generated_job_id) REFERENCES generation_jobs (job_id)
+                )
+            """)
             
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_test_results_provider 
@@ -254,6 +294,22 @@ class DatabaseManager:
                 """)
             except:
                 pass  # 테이블이 없으면 무시
+
+            try:
+                conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_scheduled_posts_schedule_time 
+                    ON scheduled_posts(schedule_time)
+                """)
+            except:
+                pass
+
+            try:
+                conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_scheduled_posts_status 
+                    ON scheduled_posts(status)
+                """)
+            except:
+                pass
             
             conn.commit()
 
@@ -1190,13 +1246,185 @@ class DatabaseManager:
                 ))
             return templates
 
+    # Scheduled posts management methods
+    def create_scheduled_post(self, scheduled_post: ScheduledPost) -> int:
+        """예약 포스트 생성"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            cursor = conn.execute("""
+                INSERT INTO scheduled_posts 
+                (schedule_id, title, topic, topic_source, schedule_time, status, provider, 
+                 workflow_template_id, repeat_config, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                scheduled_post.schedule_id,
+                scheduled_post.title,
+                scheduled_post.topic,
+                scheduled_post.topic_source,
+                scheduled_post.schedule_time,
+                scheduled_post.status,
+                scheduled_post.provider,
+                scheduled_post.workflow_template_id,
+                scheduled_post.repeat_config,
+                scheduled_post.created_at or datetime.now().isoformat(),
+                datetime.now().isoformat()
+            ))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_scheduled_post(self, schedule_id: str) -> Optional[ScheduledPost]:
+        """예약 포스트 조회"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            conn.row_factory = sqlite3.Row
+            
+            cursor = conn.execute("SELECT * FROM scheduled_posts WHERE schedule_id = ?", (schedule_id,))
+            row = cursor.fetchone()
+            
+            if row:
+                return ScheduledPost(
+                    id=row['id'],
+                    schedule_id=row['schedule_id'],
+                    title=row['title'],
+                    topic=row['topic'],
+                    topic_source=row['topic_source'],
+                    schedule_time=row['schedule_time'],
+                    status=row['status'],
+                    provider=row['provider'],
+                    workflow_template_id=row['workflow_template_id'],
+                    repeat_config=row['repeat_config'],
+                    generated_job_id=row['generated_job_id'],
+                    error_message=row['error_message'],
+                    created_at=row['created_at'],
+                    updated_at=row['updated_at'],
+                    last_executed_at=row['last_executed_at']
+                )
+            return None
+
+    def list_scheduled_posts(self, status: Optional[str] = None, limit: int = 50) -> List[ScheduledPost]:
+        """예약 포스트 목록 조회"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            conn.row_factory = sqlite3.Row
+            
+            query = "SELECT * FROM scheduled_posts"
+            params = []
+            
+            if status:
+                query += " WHERE status = ?"
+                params.append(status)
+            
+            query += " ORDER BY schedule_time ASC LIMIT ?"
+            params.append(limit)
+            
+            cursor = conn.execute(query, params)
+            
+            scheduled_posts = []
+            for row in cursor.fetchall():
+                scheduled_posts.append(ScheduledPost(
+                    id=row['id'],
+                    schedule_id=row['schedule_id'],
+                    title=row['title'],
+                    topic=row['topic'],
+                    topic_source=row['topic_source'],
+                    schedule_time=row['schedule_time'],
+                    status=row['status'],
+                    provider=row['provider'],
+                    workflow_template_id=row['workflow_template_id'],
+                    repeat_config=row['repeat_config'],
+                    generated_job_id=row['generated_job_id'],
+                    error_message=row['error_message'],
+                    created_at=row['created_at'],
+                    updated_at=row['updated_at'],
+                    last_executed_at=row['last_executed_at']
+                ))
+            return scheduled_posts
+
+    def update_scheduled_post(self, scheduled_post: ScheduledPost) -> bool:
+        """예약 포스트 업데이트"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            cursor = conn.execute("""
+                UPDATE scheduled_posts 
+                SET title = ?, topic = ?, topic_source = ?, schedule_time = ?, status = ?, 
+                    provider = ?, workflow_template_id = ?, repeat_config = ?, 
+                    generated_job_id = ?, error_message = ?, updated_at = ?, last_executed_at = ?
+                WHERE schedule_id = ?
+            """, (
+                scheduled_post.title,
+                scheduled_post.topic,
+                scheduled_post.topic_source,
+                scheduled_post.schedule_time,
+                scheduled_post.status,
+                scheduled_post.provider,
+                scheduled_post.workflow_template_id,
+                scheduled_post.repeat_config,
+                scheduled_post.generated_job_id,
+                scheduled_post.error_message,
+                datetime.now().isoformat(),
+                scheduled_post.last_executed_at,
+                scheduled_post.schedule_id
+            ))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def delete_scheduled_post(self, schedule_id: str) -> bool:
+        """예약 포스트 삭제"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            
+            cursor = conn.execute("DELETE FROM scheduled_posts WHERE schedule_id = ?", (schedule_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def get_pending_scheduled_posts(self, current_time: str) -> List[ScheduledPost]:
+        """실행 대기 중인 예약 포스트 조회"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.text_factory = str
+            conn.execute("PRAGMA encoding = 'UTF-8'")
+            conn.row_factory = sqlite3.Row
+            
+            cursor = conn.execute("""
+                SELECT * FROM scheduled_posts 
+                WHERE status = 'pending' AND schedule_time <= ?
+                ORDER BY schedule_time ASC
+            """, (current_time,))
+            
+            scheduled_posts = []
+            for row in cursor.fetchall():
+                scheduled_posts.append(ScheduledPost(
+                    id=row['id'],
+                    schedule_id=row['schedule_id'],
+                    title=row['title'],
+                    topic=row['topic'],
+                    topic_source=row['topic_source'],
+                    schedule_time=row['schedule_time'],
+                    status=row['status'],
+                    provider=row['provider'],
+                    workflow_template_id=row['workflow_template_id'],
+                    repeat_config=row['repeat_config'],
+                    generated_job_id=row['generated_job_id'],
+                    error_message=row['error_message'],
+                    created_at=row['created_at'],
+                    updated_at=row['updated_at'],
+                    last_executed_at=row['last_executed_at']
+                ))
+            return scheduled_posts
+
 
 # 전역 데이터베이스 인스턴스
 db = DatabaseManager()
 
 if __name__ == "__main__":
     # 테스트 데이터 생성
-    print("🗄️  데이터베이스 초기화 중...")
+    print("[INFO] 데이터베이스 초기화 중...")
     
     # 샘플 테스트 결과 저장
     sample_results = [
@@ -1223,8 +1451,8 @@ if __name__ == "__main__":
     for result in sample_results:
         db.save_test_result(result)
     
-    print("✅ 데이터베이스 초기화 완료!")
-    print(f"📊 저장된 테스트 결과: {len(sample_results)}개")
+    print("[OK] 데이터베이스 초기화 완료!")
+    print(f"[INFO] 저장된 테스트 결과: {len(sample_results)}개")
     
     # 기본 사용자 생성
     from datetime import datetime, timedelta
@@ -1238,7 +1466,7 @@ if __name__ == "__main__":
             role="admin",
             expires_at=None  # 만료 없음
         )
-        print("👤 admin 계정 생성됨")
+        print("[OK] admin 계정 생성됨")
         
         # validator 계정 (1년 유효)
         validator_expires = (datetime.now() + timedelta(days=365)).isoformat()
@@ -1249,7 +1477,7 @@ if __name__ == "__main__":
             role="validator",
             expires_at=validator_expires
         )
-        print("👤 validator 계정 생성됨")
+        print("[OK] validator 계정 생성됨")
         
         # 테스트 계정 (30일 유효)
         test_expires = (datetime.now() + timedelta(days=30)).isoformat()
@@ -1260,10 +1488,10 @@ if __name__ == "__main__":
             role="user",
             expires_at=test_expires
         )
-        print("👤 testuser 계정 생성됨")
+        print("[OK] testuser 계정 생성됨")
         
     except Exception as e:
-        print(f"⚠️  사용자 생성 중 오류 (이미 존재할 수 있음): {e}")
+        print(f"[WARN] 사용자 생성 중 오류 (이미 존재할 수 있음): {e}")
     
     # 기본 워크플로우 템플릿 생성
     try:
@@ -1382,12 +1610,12 @@ if __name__ == "__main__":
         db.create_workflow_template(travel_template)
         db.create_workflow_template(news_template)
         db.create_workflow_template(social_template)
-        print("📝 기본 워크플로우 템플릿 생성됨")
+        print("[OK] 기본 워크플로우 템플릿 생성됨")
         
     except Exception as e:
-        print(f"⚠️  워크플로우 템플릿 생성 중 오류 (이미 존재할 수 있음): {e}")
+        print(f"[WARN] 워크플로우 템플릿 생성 중 오류 (이미 존재할 수 있음): {e}")
     
-    print("\n🔑 기본 계정 정보:")
+    print("\n[INFO] 기본 계정 정보:")
     print("   - admin / admin123! (관리자, 무제한)")
     print("   - validator / validator123 (검증자, 1년)")
     print("   - testuser / test123 (사용자, 30일)")
@@ -1395,4 +1623,4 @@ if __name__ == "__main__":
     # 통계 확인
     for provider in ["gemini", "claude", "openai", "grok"]:
         stats = db.get_provider_stats(provider)
-        print(f"📈 {provider}: {stats['total_tests']}회 테스트, {stats['success_rate']}% 성공률")
+        print(f"[STATS] {provider}: {stats['total_tests']}회 테스트, {stats['success_rate']}% 성공률")

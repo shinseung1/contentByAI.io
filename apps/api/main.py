@@ -10,18 +10,8 @@ from pydantic import BaseModel
 
 from packages.core.config import get_settings
 from packages.core.database import create_tables
-from apps.api.routers import bundles, generation, publishing, health, users, workflows
-
-# 간단한 인메모리 인증
-USERS = {
-    "admin": {
-        "password": "admin123!",
-        "role": "admin",
-        "id": 1,
-        "username": "admin",
-        "email": "admin@company.com"
-    }
-}
+from apps.api.routers import bundles, generation, publishing, health, users, workflows, scheduled_posts
+from database import DatabaseManager
 
 SESSIONS = {}
 
@@ -61,7 +51,7 @@ def create_app() -> FastAPI:
     
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3002", "http://127.0.0.1:3002", "http://localhost:3001", "http://127.0.0.1:3001", "http://localhost:3005", "http://127.0.0.1:3005"],
+        allow_origins=["http://localhost:3002", "http://127.0.0.1:3002", "http://localhost:3001", "http://127.0.0.1:3001", "http://localhost:3000", "http://127.0.0.1:3000"],
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
@@ -73,17 +63,27 @@ def create_app() -> FastAPI:
     app.include_router(publishing.router, prefix="/api/v1")
     app.include_router(users.router, prefix="/api/v1")
     app.include_router(workflows.router, prefix="/api/v1")
+    app.include_router(scheduled_posts.router, prefix="/api/v1")
     
     # Auth endpoints directly in main
     @app.post("/api/v1/auth/login", response_model=LoginResponse)
     async def login(request: LoginRequest):
         try:
-            if request.username not in USERS:
-                return LoginResponse(success=False, message="Invalid username")
+            print(f"DEBUG: Login attempt for username: '{request.username}', password: '{request.password}'")
+            db = DatabaseManager()
+            success, user, message = db.verify_user_password(request.username, request.password)
+            print(f"DEBUG: Auth result - success: {success}, user: {user}, message: {message}")
             
-            user_data = USERS[request.username]
-            if user_data["password"] != request.password:
-                return LoginResponse(success=False, message="Invalid password")
+            if not success:
+                return LoginResponse(success=False, message=message)
+            
+            # 사용자 정보를 딕셔너리로 변환
+            user_data = {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "role": user.role
+            }
             
             token = secrets.token_hex(32)
             SESSIONS[token] = user_data
@@ -95,6 +95,9 @@ def create_app() -> FastAPI:
                 user=user_data
             )
         except Exception as e:
+            print(f"DEBUG: Exception during login: {e}")
+            import traceback
+            traceback.print_exc()
             return LoginResponse(success=False, message=f"Login failed: {str(e)}")
     
     @app.get("/api/v1/auth/validate", response_model=AuthValidateResponse)

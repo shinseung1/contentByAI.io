@@ -74,7 +74,7 @@ export default function GenerationHistory() {
 
   const fetchJobs = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:3005/api/v1/generation/jobs')
+      const response = await fetch('http://127.0.0.1:3000/api/v1/generation/jobs')
       const data = await response.json()
       
       if (data.error) {
@@ -108,7 +108,7 @@ export default function GenerationHistory() {
   const fetchJobContent = async (jobId: string) => {
     setContentLoading(true)
     try {
-      const response = await fetch(`http://127.0.0.1:3005/api/v1/generation/jobs/${jobId}`)
+      const response = await fetch(`http://127.0.0.1:3000/api/v1/generation/jobs/${jobId}`)
       const data = await response.json()
       
       if (data.content) {
